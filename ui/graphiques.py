@@ -11,14 +11,14 @@ def fig_radar(s1: dict, s2: dict, n1: str, n2: str, c: dict) -> go.Figure:
     fig.add_trace(go.Scatterpolar(
         r=s1["radar"] + [s1["radar"][0]], theta=cats + [cats[0]],
         fill="toself", name=n1,
-        line=dict(color="#3b82f6", width=2),
-        fillcolor="rgba(59,130,246,0.15)"
+        line=dict(color=c["acc"], width=2),
+        fillcolor=c.get("acc_alpha", "rgba(59,130,246,0.15)")
     ))
     fig.add_trace(go.Scatterpolar(
         r=s2["radar"] + [s2["radar"][0]], theta=cats + [cats[0]],
         fill="toself", name=n2,
-        line=dict(color="#ef4444", width=2),
-        fillcolor="rgba(239,68,68,0.15)"
+        line=dict(color=c.get("danger", "#ef4444"), width=2),
+        fillcolor=c.get("danger_alpha", "rgba(239,68,68,0.15)")
     ))
     fig.update_layout(
         polar=dict(
@@ -39,8 +39,8 @@ def fig_barres(s1: dict, s2: dict, n1: str, n2: str, c: dict) -> go.Figure:
     v1 = [round(s1["mbp"], 2), round(s1["mbc"], 2), round(s1["pts_par_match"], 2), s1["diff"]]
     v2 = [round(s2["mbp"], 2), round(s2["mbc"], 2), round(s2["pts_par_match"], 2), s2["diff"]]
     fig = go.Figure()
-    fig.add_trace(go.Bar(name=n1, x=cats, y=v1, marker_color="#3b82f6", opacity=0.85))
-    fig.add_trace(go.Bar(name=n2, x=cats, y=v2, marker_color="#ef4444", opacity=0.85))
+    fig.add_trace(go.Bar(name=n1, x=cats, y=v1, marker_color=c["acc"], opacity=0.85))
+    fig.add_trace(go.Bar(name=n2, x=cats, y=v2, marker_color=c.get("danger", "#ef4444"), opacity=0.85))
     fig.update_layout(
         barmode="group",
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -60,7 +60,7 @@ def fig_heatmap(mat: list, n1: str, n2: str, c: dict) -> go.Figure:
         z=z,
         x=[f"{n2} {a}" for a in range(n)],
         y=[f"{n1} {h}" for h in range(n)],
-        colorscale=[[0, c["card2"]], [0.5, c["acc"]], [1, "#60a5fa"]],
+        colorscale=[[0, c["card2"]], [0.5, c["acc"]], [1, c.get("acc_hover", "#60a5fa")]],
         showscale=True,
         hovertemplate="Score %{y} – %{x}<br>Probabilité : %{z:.1f}%<extra></extra>",
         text=[[f"{v:.1f}%" for v in row] for row in z],

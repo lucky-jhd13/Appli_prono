@@ -5,6 +5,8 @@
 API_KEY = "6845fbe629e041bdb8f0cad7488a9fe2"
 
 CHAMPIONNATS = {
+    "🇪🇺 Champions League": "CL",
+    "🇪🇺 Europa League": "EL",
     "🇫🇷 Ligue 1":          "FL1",
     "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "PL",
     "🇪🇸 La Liga":           "PD",

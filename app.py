@@ -14,10 +14,10 @@ from core.moteur  import (
     probabilites_depuis_matrice, score_le_plus_probable,
     kelly_criterion, poisson,
 )
-from ui.theme      import get_couleurs, injecter_css
+from style import get_couleurs, injecter_css, couleur_prob
 from ui.composants import (
     match_header_html, stat_grid_html,
-    verdict_card_html, kelly_html, couleur_prob,
+    verdict_card_html, kelly_html,
 )
 from ui.graphiques import fig_radar, fig_barres, fig_heatmap, fig_jauge
 
@@ -27,13 +27,21 @@ st.set_page_config(page_title="PRO-FOOT AI V12", page_icon="🏆", layout="wide"
 # ─── Sidebar ────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ RÉGLAGES")
-    theme_clair = st.toggle("☀️ Mode Clair", value=False)
-    st.divider()
+    
+    # 1. Le choix de la compétition
     choix_ligue = st.selectbox("🏆 CHAMPIONNAT", list(CHAMPIONNATS.keys()))
-    st.info("Algorithme : Poisson Bivarié · Lambda Normalisé · Kelly")
+    
     st.divider()
-    st.markdown("**📖 Légende forme**")
-    st.markdown("`W` Victoire · `D` Nul · `L` Défaite")
+
+    # 2. Le bouton pour forcer la mise à jour des scores/classements
+    if st.button("🔄 ACTUALISER LES DONNÉES", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+    st.divider()
+
+    # 3. L'option esthétique en bas
+    theme_clair = st.toggle("☀️ Mode Clair", value=False)
 
 # ─── Thème & CSS ────────────────────────────────
 c = get_couleurs(theme_clair)
@@ -102,7 +110,7 @@ with tab1:
         st.markdown(stat_grid_html(s1, l_h, c["acc"]), unsafe_allow_html=True)
     with cs2:
         st.markdown(f"**✈️ {n2}** — Rang #{e2['position']}")
-        st.markdown(stat_grid_html(s2, l_a, "#ef4444"), unsafe_allow_html=True)
+        st.markdown(stat_grid_html(s2, l_a, c["danger"]), unsafe_allow_html=True)
 
     # ── Graphiques ───────────────────────────────
     st.markdown('<div class="section-title">📊 Visualisations</div>', unsafe_allow_html=True)
@@ -131,9 +139,9 @@ with tab1:
     # ── Verdict expert ───────────────────────────
     st.markdown('<div class="section-title">🏆 Verdict Expert & Value Bets</div>', unsafe_allow_html=True)
 
-    if p1 > p2 and p1 > pn:   res, prob_f, coul_r = n1, p1, "#3b82f6"
-    elif p2 > p1 and p2 > pn: res, prob_f, coul_r = n2, p2, "#ef4444"
-    else:                       res, prob_f, coul_r = "Match Nul", pn, "#fbbf24"
+    if p1 > p2 and p1 > pn:   res, prob_f, coul_r = n1, p1, c["acc"]
+    elif p2 > p1 and p2 > pn: res, prob_f, coul_r = n2, p2, c["danger"]
+    else:                       res, prob_f, coul_r = "Match Nul", pn, c["warning"]
     cote_1n2 = round(1 / prob_f, 2) if prob_f > 0 else 99
 
     vd1, vd2, vd3 = st.columns(3)

@@ -2,6 +2,7 @@
 # ui/composants.py — Composants HTML & helpers visuels
 # ─────────────────────────────────────────────
 
+from style import couleur_prob
 
 def forme_html(form_str: str) -> str:
     """Génère les badges colorés de forme (V/N/D)."""
@@ -11,14 +12,6 @@ def forme_html(form_str: str) -> str:
         cls, label = mapping.get(c, ("forme-d", "?"))
         badges.append(f'<span class="{cls}">{label}</span>')
     return f'<div class="forme-container">{"".join(badges)}</div>'
-
-
-def couleur_prob(p: float) -> str:
-    """Retourne une couleur hex selon le niveau de probabilité."""
-    if p >= 0.55: return "#4ade80"
-    if p >= 0.40: return "#fbbf24"
-    return "#f87171"
-
 
 def match_header_html(
     n1: str, n2: str,
@@ -58,8 +51,8 @@ def match_header_html(
 
 def stat_grid_html(s: dict, lambda_val: float, color: str) -> str:
     """Grille 3×2 de statistiques pour une équipe."""
-    diff_color = "#f87171" if s["diff"] < 0 else "#4ade80"
-    diff_str   = f"+{s['diff']}" if s["diff"] > 0 else str(s["diff"])
+    diff_cls = "diff-neg" if s["diff"] < 0 else "diff-pos"
+    diff_str = f"+{s['diff']}" if s["diff"] > 0 else str(s["diff"])
     return f"""
     <div class="stat-grid">
         <div class="stat-card"><span class="stat-value">{s['mbp']:.2f}</span><span class="stat-label">Buts / match</span></div>
@@ -67,7 +60,7 @@ def stat_grid_html(s: dict, lambda_val: float, color: str) -> str:
         <div class="stat-card"><span class="stat-value">{s['pts_par_match']:.2f}</span><span class="stat-label">Pts / match</span></div>
         <div class="stat-card"><span class="stat-value">{s['won']}</span><span class="stat-label">Victoires</span></div>
         <div class="stat-card"><span class="stat-value">{s['draw']}</span><span class="stat-label">Nuls</span></div>
-        <div class="stat-card"><span class="stat-value" style="color:{diff_color}">{diff_str}</span><span class="stat-label">Diff buts</span></div>
+        <div class="stat-card"><span class="stat-value {diff_cls}">{diff_str}</span><span class="stat-label">Diff buts</span></div>
     </div>
     <p style="font-size:0.8rem;opacity:0.55;">λ (Expected Goals) : <strong style="color:{color}">{lambda_val:.2f}</strong></p>
     """
