@@ -6,7 +6,7 @@
 import streamlit as st
 import pandas as pd
 
-from config import CHAMPIONNATS, SEUIL_BTTS, SEUIL_OVER25, SEUIL_VALUE
+from config import CHAMPIONNATS, SEUIL_BTTS, SEUIL_OVER15, SEUIL_VALUE
 from core.api     import charger_classement, moyenne_buts_ligue
 from core.stats   import extraire_stats
 from core.moteur  import (
@@ -90,7 +90,7 @@ with tab1:
     # ── Calcul ──────────────────────────────────
     l_h, l_a = calculer_lambdas(s1, s2, moy_gf, but1, but2, rep1, rep2)
     mat       = matrice_scores(l_h, l_a)
-    p1, pn, p2, pbtts, p_over25 = probabilites_depuis_matrice(mat)
+    p1, pn, p2, pbtts, p_over15 = probabilites_depuis_matrice(mat)
     score_h, score_a, score_prob = score_le_plus_probable(mat)
 
     logo1 = e1["team"].get("crest", "")
@@ -132,7 +132,7 @@ with tab1:
     with gj1:
         st.plotly_chart(fig_jauge(p1, f"Victoire {n1}", couleur_prob(p1), c), use_container_width=True)
     with gj2:
-        st.plotly_chart(fig_jauge(p_over25, "Over 2.5 buts", couleur_prob(p_over25), c), use_container_width=True)
+        st.plotly_chart(fig_jauge(p_over15, "Over 1.5 buts", couleur_prob(p_over15), c), use_container_width=True)
     with gj3:
         st.plotly_chart(fig_jauge(pbtts, "BTTS", couleur_prob(pbtts), c), use_container_width=True)
 
@@ -160,17 +160,17 @@ with tab1:
 
     # Over/Under
     with vd2:
-        cote_o = round(1 / p_over25, 2) if p_over25 > 0 else 9.99
-        cote_u = round(1 / (1 - p_over25), 2) if p_over25 < 1 else 9.99
-        label_o = "OVER 2.5" if p_over25 > SEUIL_OVER25 else "UNDER 2.5"
-        badge_o = '<span class="badge-green">📈 OVER 2.5</span>' if p_over25 > SEUIL_OVER25 else '<span class="badge-red">📉 UNDER 2.5</span>'
+        cote_o = round(1 / p_over15, 2) if p_over15 > 0 else 9.99
+        cote_u = round(1 / (1 - p_over15), 2) if p_over15 < 1 else 9.99
+        label_o = "OVER 1.5" if p_over15 > SEUIL_OVER15 else "UNDER 1.5"
+        badge_o = '<span class="badge-green">📈 OVER 1.5</span>' if p_over15 > SEUIL_OVER15 else '<span class="badge-red">📉 UNDER 1.5</span>'
         st.markdown(
-            verdict_card_html("⚽ Buts Over/Under", label_o, p_over25, badge_o,
+            verdict_card_html("⚽ Buts Over/Under", label_o, p_over15, badge_o,
                               f"Cote algo Over : {cote_o} · Under : {cote_u}"),
             unsafe_allow_html=True
         )
-        c_bk_o = st.number_input("Cote bookmaker Over 2.5", 1.01, 10.0, 1.90, 0.05, key="k2")
-        kelly_o = kelly_criterion(p_over25, c_bk_o)
+        c_bk_o = st.number_input("Cote bookmaker Over 1.5", 1.01, 10.0, 1.30, 0.05, key="k2")
+        kelly_o = kelly_criterion(p_over15, c_bk_o)
         st.markdown(kelly_html(kelly_o, c_bk_o > cote_o + SEUIL_VALUE), unsafe_allow_html=True)
 
     # BTTS

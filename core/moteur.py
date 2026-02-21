@@ -30,17 +30,17 @@ def matrice_scores(l_h: float, l_a: float, n: int = MAX_BUTS_MATRICE) -> list[li
 # ── Probabilités depuis la matrice ────────────
 def probabilites_depuis_matrice(mat: list[list[float]]) -> tuple:
     """
-    Retourne (p1, pn, p2, pbtts, p_over25) depuis la matrice des scores.
+    Retourne (p1, pn, p2, pbtts, p_over15) depuis la matrice des scores.
     """
-    p1 = pn = p2 = pbtts = p_over25 = 0.0
+    p1 = pn = p2 = pbtts = p_over15 = 0.0
     for h, row in enumerate(mat):
         for a, p in enumerate(row):
             if h > a:   p1 += p
             elif h == a: pn += p
             else:        p2 += p
             if h > 0 and a > 0:   pbtts   += p
-            if h + a >= 3:        p_over25 += p
-    return p1, pn, p2, pbtts, p_over25
+            if h + a >= 2:        p_over15 += p
+    return p1, pn, p2, pbtts, p_over15
 
 
 # ── Score le plus probable ─────────────────────

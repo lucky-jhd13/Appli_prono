@@ -20,7 +20,7 @@ MAX_BUTS_MATRICE = 8
 
 # Seuils de décision
 SEUIL_BTTS    = 0.50   # > 50% → BTTS OUI
-SEUIL_OVER25  = 0.52   # > 52% → Over 2.5
+SEUIL_OVER15  = 0.52   # > 52% → Over 1.5
 SEUIL_VALUE   = 0.15   # écart min cote_book - cote_algo pour value bet
 
 # Avantage domicile
