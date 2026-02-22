@@ -1,216 +1,213 @@
+# ─────────────────────────────────────────────
+# app.py — Point d'entrée principal (orchestrateur)
+# Lance avec : streamlit run app.py
+# ─────────────────────────────────────────────
+
 import streamlit as st
-import requests
 import pandas as pd
-import plotly.graph_objects as go
-import math
 
-# --- 1. CONFIGURATION ---
-API_KEY = "6845fbe629e041bdb8f0cad7488a9fe2"
-CHAMPIONNATS = {
-    "🇫🇷 Ligue 1": "FL1", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "PL", "🇪🇸 La Liga": "PD",
-    "🇩🇪 Bundesliga": "BL1", "🇮🇹 Serie A": "SA", "🇳🇱 Eredivisie": "DED"
-}
+from config import CHAMPIONNATS, SEUIL_BTTS, SEUIL_OVER15, SEUIL_VALUE
+from core.api     import charger_classement, moyenne_buts_ligue
+from core.stats   import extraire_stats
+from core.moteur  import (
+    calculer_lambdas, matrice_scores,
+    probabilites_depuis_matrice, score_le_plus_probable,
+    kelly_criterion, poisson,
+)
+from style import get_couleurs, injecter_css, couleur_prob
+from ui.composants import (
+    match_header_html, stat_grid_html,
+    verdict_card_html, kelly_html,
+)
+from ui.graphiques import fig_radar, fig_barres, fig_heatmap, fig_jauge
 
-st.set_page_config(page_title="PRO-FOOT AI V11.5", page_icon="🏆", layout="wide")
+# ─── Config page ────────────────────────────────
+st.set_page_config(page_title="PRO-FOOT AI V12", page_icon="🏆", layout="wide")
 
-# --- 2. SIDEBAR (LOGIQUE PRIORITAIRE) ---
+# ─── Sidebar ────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ RÉGLAGES")
-    theme_clair = st.toggle("☀️ Mode Clair", value=False, key="force_theme_toggle")
-    st.divider()
+    
+    # 1. Le choix de la compétition
     choix_ligue = st.selectbox("🏆 CHAMPIONNAT", list(CHAMPIONNATS.keys()))
-    st.info("Algorithme : Poisson Matriciel Bivarié")
-
-# --- 3. COULEURS DYNAMIQUES ET CSS DE SURVIE ---
-if theme_clair:
-    bg, card, txt, brd, grid = "#FFFFFF", "#F8FAFC", "#0F172A", "#E2E8F0", "#94A3B8"
-else:
-    bg, card, txt, brd, grid = "#0E1117", "#1D2129", "#FFFFFF", "#30363D", "#444444"
-
-st.markdown(f"""
-    <style>
-    /* Forçage visuel global */
-    header[data-testid="stHeader"] {{ background: transparent !important; border: none !important; }}
-    .stApp {{ background-color: {bg}; color: {txt}; }}
-    .stApp, .stMarkdown, p, h1, h2, h3, span, label, li {{ color: {txt} !important; }}
-
-    /* FIX SELECTBOX CONTRASTES */
-    div[data-baseweb="select"] > div {{ background-color: {card} !important; color: {txt} !important; }}
-    div[data-baseweb="popover"] ul {{ background-color: {card} !important; }}
-    div[data-baseweb="popover"] li {{ color: {txt} !important; }}
-
-    /* Sidebar Fix */
-    [data-testid="stSidebar"] {{ background-color: {card} !important; min-width: 250px !important; }}
     
-    .team-card {{
-        background-color: {card};
-        padding: 25px;
-        border-radius: 20px;
-        border: 1px solid {brd};
-        text-align: center;
-        margin-bottom: 15px;
-        transition: transform 0.3s;
-    }}
-    .team-card:hover {{ transform: scale(1.02); border-color: #3b82f6; }}
-    
-    .verdict-box {{
-        background-color: {card};
-        padding: 20px;
-        border-radius: 15px;
-        border-left: 5px solid #3b82f6;
-        margin-top: 10px;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+    st.divider()
 
-# --- 4. FONCTIONS MATHÉMATIQUES (MOTEUR PRO) ---
-def loi_de_poisson(moyenne_lambda, k):
-    if moyenne_lambda <= 0: return 0
-    return (math.pow(moyenne_lambda, k) * math.exp(-moyenne_lambda)) / math.factorial(k)
+    # 2. Le bouton pour forcer la mise à jour des scores/classements
+    if st.button("🔄 ACTUALISER LES DONNÉES", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-def calculer_probabilites_completes(l_h, l_a):
-    prob_1, prob_n, prob_2, prob_btts = 0, 0, 0, 0
-    for h in range(10): # On monte à 10 buts pour la précision
-        for a in range(10):
-            p = loi_de_poisson(l_h, h) * loi_de_poisson(l_a, a)
-            if h > a: prob_1 += p
-            elif h == a: prob_n += p
-            else: prob_2 += p
-            if h > 0 and a > 0: prob_btts += p
-    return prob_1, prob_n, prob_2, prob_btts
+    st.divider()
 
-# --- 5. CHARGEMENT ET TRAITEMENT DES DONNÉES ---
-@st.cache_data(ttl=3600)
-def charger_donnees(league_code):
-    url = f"https://api.football-data.org/v4/competitions/{league_code}/standings"
-    headers = {"X-Auth-Token": API_KEY}
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()['standings'][0]['table']
-        return None
-    except: return None
+    # 3. L'option esthétique en bas
+    theme_clair = st.toggle("☀️ Mode Clair", value=False)
 
-def calculer_base_stats(equipe_data):
-    if not equipe_data: return [50, 50, 50, 50], 1.0, 1.0
-    pj = equipe_data.get('playedGames', 0)
-    if pj == 0: return [50, 50, 50, 50], 1.0, 1.0
-    
-    mbp = equipe_data.get('goalsFor', 0) / pj
-    mbc = equipe_data.get('goalsAgainst', 0) / pj
-    
-    att = min(mbp * 45, 100)
-    defe = max(100 - (mbc * 50), 0)
-    
-    f_str = str(equipe_data.get('form', 'DDDDD')).replace(',', '')[-5:]
-    pts_f = (f_str.count('W') * 3) + f_str.count('D')
-    forme_f = (pts_f / 15) * 100
-    vic = (equipe_data.get('won', 0) / pj) * 100
-    
-    return [int(att), int(defe), int(vic), int(forme_f)], mbp, mbc
+# ─── Thème & CSS ────────────────────────────────
+c = get_couleurs(theme_clair)
+injecter_css(c)
 
-# --- 6. LOGIQUE D'ANALYSE ---
-data_ligue = charger_donnees(CHAMPIONNATS[choix_ligue])
+# ─── Chargement données ─────────────────────────
+data_ligue = charger_classement(CHAMPIONNATS[choix_ligue])
 
-if data_ligue:
-    tab1, tab2 = st.tabs(["🎯 ANALYSE POISSON", "📈 CLASSEMENT"])
-    
-    with tab1:
-        equipes = sorted([e['team']['name'] for e in data_ligue])
-        c1, c2 = st.columns(2)
-        n1 = c1.selectbox("🏠 Domicile", equipes, index=0)
-        n2 = c2.selectbox("✈️ Extérieur", equipes, index=min(1, len(equipes)-1))
+if not data_ligue:
+    st.error("⚠️ Impossible de récupérer les données. Vérifie ta clé API ou ton quota.")
+    st.stop()
 
-        e1 = next(e for e in data_ligue if e['team']['name'] == n1)
-        e2 = next(e for e in data_ligue if e['team']['name'] == n2)
-        
-        st.markdown("### 🛠️ AJUSTEMENTS TERRAIN")
-        aj1, aj2 = st.columns(2)
-        but1 = aj1.toggle(f"Buteur {n1} présent", value=True, key="bt1")
-        rep1 = aj1.slider(f"Repos {n1} (Jours)", 1, 14, 7, key="sl1")
-        but2 = aj2.toggle(f"Buteur {n2} présent", value=True, key="bt2")
-        rep2 = aj2.slider(f"Repos {n2} (Jours)", 1, 14, 7, key="sl2")
+moy_gf = moyenne_buts_ligue(data_ligue)
 
-        stats1, mbp1, mbc1 = calculer_base_stats(e1)
-        stats2, mbp2, mbc2 = calculer_base_stats(e2)
-        
-        # --- CALCUL LAMBDA (Moyennes ajustées) ---
-        l_h = mbp1 * mbc2 * (1.0 if but1 else 0.75) * (1.1 if rep1 > 4 else 0.85)
-        l_a = mbp2 * mbc1 * (1.0 if but2 else 0.75) * (1.1 if rep2 > 4 else 0.85)
-        
-        # Avantage domicile dynamique
-        l_h *= 1.10 
+# ─── Tabs ───────────────────────────────────────
+tab1, tab2 = st.tabs(["🎯 ANALYSE MATCH", "📊 CLASSEMENT"])
 
-        p1, pn, p2, pbtts = calculer_probabilites_completes(l_h, l_a)
+# ════════════════════════════════════════════════
+# TAB 1 — ANALYSE
+# ════════════════════════════════════════════════
+with tab1:
+    equipes = sorted([e["team"]["name"] for e in data_ligue])
+    col_sel1, col_sel2 = st.columns(2)
+    n1 = col_sel1.selectbox("🏠 Domicile",  equipes, index=0)
+    n2 = col_sel2.selectbox("✈️ Extérieur", equipes, index=min(1, len(equipes) - 1))
 
-        st.divider()
-        cl, cr = st.columns(2)
-        cl.markdown(f'<div class="team-card"><img src="{e1["team"]["crest"]}" width="70"><h3>{n1}</h3><h1>{p1*100:.1f}%</h1><p>Expected Goals : {l_h:.2f}</p></div>', unsafe_allow_html=True)
-        cr.markdown(f'<div class="team-card"><img src="{e2["team"]["crest"]}" width="70"><h3>{n2}</h3><h1>{p2*100:.1f}%</h1><p>Expected Goals : {l_a:.2f}</p></div>', unsafe_allow_html=True)
+    if n1 == n2:
+        st.warning("⚠️ Sélectionne deux équipes différentes.")
+        st.stop()
 
-        # Radar Chart Plotly
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=stats1, theta=['Attaque','Défense','Victoires','Forme'], fill='toself', name=n1, line_color='#3b82f6'))
-        fig.add_trace(go.Scatterpolar(r=stats2, theta=['Attaque','Défense','Victoires','Forme'], fill='toself', name=n2, line_color='#ef4444'))
-        fig.update_layout(polar=dict(bgcolor="rgba(0,0,0,0)", radialaxis=dict(visible=True, range=[0, 100], gridcolor=grid)), paper_bgcolor="rgba(0,0,0,0)", font=dict(color=txt), height=450)
-        st.plotly_chart(fig, use_container_width=True)
+    e1 = next(e for e in data_ligue if e["team"]["name"] == n1)
+    e2 = next(e for e in data_ligue if e["team"]["name"] == n2)
+    s1 = extraire_stats(e1)
+    s2 = extraire_stats(e2)
 
-        # --- VERDICT EXPERT ---
-        st.markdown("### 🏆 VERDICT EXPERT")
-        v1, v2, v3 = st.columns(3)
-        
-        with v1:
-            st.markdown("**PRONO 1N2**")
-            if p1 > p2 and p1 > pn: res, prob_f = n1, p1
-            elif p2 > p1 and p2 > pn: res, prob_f = n2, p2
-            else: res, prob_f = "Match Nul", pn
-            
-            st.metric("Prono", res, f"{int(prob_f*100)}%")
-            cote_algo = round(1 / prob_f, 2)
-            st.caption(f"📊 Cote Algo : {cote_algo}")
-            
-            c_book = st.number_input("Cote Bookmaker", 1.01, 20.0, float(cote_algo), 0.05, key="k1")
-            if c_book > (cote_algo + 0.20): st.success("🔥 VALUE BET DETECTÉ")
+    # ── Ajustements terrain ──────────────────────
+    st.markdown('<div class="section-title">🛠️ Ajustements terrain</div>', unsafe_allow_html=True)
+    aj1, aj2 = st.columns(2)
+    with aj1:
+        but1 = st.toggle(f"Buteur principal {n1} présent", value=True, key="bt1")
+        rep1 = st.slider(f"Jours de repos — {n1}", 1, 14, 7, key="sl1")
+    with aj2:
+        but2 = st.toggle(f"Buteur principal {n2} présent", value=True, key="bt2")
+        rep2 = st.slider(f"Jours de repos — {n2}", 1, 14, 7, key="sl2")
 
-        with v2:
-            st.markdown("**BUTS (+2.5)**")
-            p_over25 = 1 - (loi_de_poisson(l_h+l_a, 0) + loi_de_poisson(l_h+l_a, 1) + loi_de_poisson(l_h+l_a, 2))
-            st.metric("Confiance", f"{int(p_over25*100)}%")
-            if p_over25 > 0.55: st.error("📈 OVER 2.5")
-            else: st.info("📉 UNDER 2.5")
-            
-            cote_o_algo = round(1/p_over25, 2) if p_over25 > 0 else 9.99
-            st.caption(f"📊 Cote Algo Over : {cote_o_algo}")
-            c_book_o = st.number_input("Cote Bookmaker Over", 1.01, 10.0, 1.90, 0.05, key="k2")
+    # ── Calcul ──────────────────────────────────
+    l_h, l_a = calculer_lambdas(s1, s2, moy_gf, but1, but2, rep1, rep2)
+    mat       = matrice_scores(l_h, l_a)
+    p1, pn, p2, pbtts, p_over15 = probabilites_depuis_matrice(mat)
+    score_h, score_a, score_prob = score_le_plus_probable(mat)
 
-        with v3:
-            st.markdown("**BTTS (2 marquent)**")
-            st.metric("Probabilité", f"{int(pbtts*100)}%")
-            if pbtts > 0.58: st.success("✅ OUI")
-            else: st.error("❌ NON")
-            
-            cote_b_algo = round(1/pbtts, 2) if pbtts > 0 else 9.99
-            st.caption(f"📊 Cote Algo BTTS : {cote_b_algo}")
-            c_book_b = st.number_input("Cote Bookmaker BTTS", 1.01, 10.0, 1.85, 0.05, key="k3")
+    logo1 = e1["team"].get("crest", "")
+    logo2 = e2["team"].get("crest", "")
 
-    with tab2:
-        st.markdown("### 📊 CLASSEMENT ACTUEL")
-        df = pd.DataFrame([
-            {
-                "Rang": e['position'], 
-                "Équipe": e['team']['name'], 
-                "MJ": e['playedGames'],
-                "Pts": e['points'], 
-                "Buts +": e['goalsFor'],
-                "Buts -": e['goalsAgainst'],
-                "Forme": e['form']
-            } for e in data_ligue
-        ])
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    # ── En-tête match ────────────────────────────
+    st.markdown(
+        match_header_html(n1, n2, logo1, logo2, p1, pn, p2, s1["form"], s2["form"]),
+        unsafe_allow_html=True
+    )
 
-else:
-    st.error("⚠️ Impossible de récupérer les données. Vérifie ta clé API-Football-Data ou ton quota.")
+    # ── Stats comparées ──────────────────────────
+    st.markdown('<div class="section-title">📋 Stats saison comparées</div>', unsafe_allow_html=True)
+    cs1, cs2 = st.columns(2)
+    with cs1:
+        st.markdown(f"**🏠 {n1}** — Rang #{e1['position']}")
+        st.markdown(stat_grid_html(s1, l_h, c["acc"]), unsafe_allow_html=True)
+    with cs2:
+        st.markdown(f"**✈️ {n2}** — Rang #{e2['position']}")
+        st.markdown(stat_grid_html(s2, l_a, c["danger"]), unsafe_allow_html=True)
 
-# --- 7. FOOTER ---
+    # ── Graphiques ───────────────────────────────
+    st.markdown('<div class="section-title">📊 Visualisations</div>', unsafe_allow_html=True)
+    gc1, gc2 = st.columns(2)
+    with gc1:
+        st.plotly_chart(fig_radar(s1, s2, n1, n2, c), use_container_width=True)
+    with gc2:
+        st.plotly_chart(fig_barres(s1, s2, n1, n2, c), use_container_width=True)
+
+    st.plotly_chart(fig_heatmap(mat, n1, n2, c), use_container_width=True)
+    st.markdown(
+        f'<div class="heatmap-note">Score le plus probable : <strong>{n1} {score_h}–{score_a} {n2}</strong> ({score_prob*100:.1f}%)</div>',
+        unsafe_allow_html=True
+    )
+
+    # ── Jauges ───────────────────────────────────
+    st.markdown('<div class="section-title">🎯 Probabilités détaillées</div>', unsafe_allow_html=True)
+    gj1, gj2, gj3 = st.columns(3)
+    with gj1:
+        st.plotly_chart(fig_jauge(p1, f"Victoire {n1}", couleur_prob(p1), c), use_container_width=True)
+    with gj2:
+        st.plotly_chart(fig_jauge(p_over15, "Over 1.5 buts", couleur_prob(p_over15), c), use_container_width=True)
+    with gj3:
+        st.plotly_chart(fig_jauge(pbtts, "BTTS", couleur_prob(pbtts), c), use_container_width=True)
+
+    # ── Verdict expert ───────────────────────────
+    st.markdown('<div class="section-title">🏆 Verdict Expert & Value Bets</div>', unsafe_allow_html=True)
+
+    if p1 > p2 and p1 > pn:   res, prob_f, coul_r = n1, p1, c["acc"]
+    elif p2 > p1 and p2 > pn: res, prob_f, coul_r = n2, p2, c["danger"]
+    else:                       res, prob_f, coul_r = "Match Nul", pn, c["warning"]
+    cote_1n2 = round(1 / prob_f, 2) if prob_f > 0 else 99
+
+    vd1, vd2, vd3 = st.columns(3)
+
+    # 1N2
+    with vd1:
+        badge_1n2 = f'<span class="badge-blue">👉 {res}</span>'
+        st.markdown(
+            verdict_card_html("🏆 Prono 1N2", f'<span style="color:{coul_r}">{res}</span>', prob_f, badge_1n2,
+                              f"Cote algo : {cote_1n2} · Score probable : {score_h}–{score_a}"),
+            unsafe_allow_html=True
+        )
+        c_bk1 = st.number_input("Cote bookmaker 1N2", 1.01, 30.0, float(cote_1n2), 0.05, key="k1")
+        kelly_1 = kelly_criterion(prob_f, c_bk1)
+        st.markdown(kelly_html(kelly_1, c_bk1 > cote_1n2 + SEUIL_VALUE), unsafe_allow_html=True)
+
+    # Over/Under
+    with vd2:
+        cote_o = round(1 / p_over15, 2) if p_over15 > 0 else 9.99
+        cote_u = round(1 / (1 - p_over15), 2) if p_over15 < 1 else 9.99
+        label_o = "OVER 1.5" if p_over15 > SEUIL_OVER15 else "UNDER 1.5"
+        badge_o = '<span class="badge-green">📈 OVER 1.5</span>' if p_over15 > SEUIL_OVER15 else '<span class="badge-red">📉 UNDER 1.5</span>'
+        st.markdown(
+            verdict_card_html("⚽ Buts Over/Under", label_o, p_over15, badge_o,
+                              f"Cote algo Over : {cote_o} · Under : {cote_u}"),
+            unsafe_allow_html=True
+        )
+        c_bk_o = st.number_input("Cote bookmaker Over 1.5", 1.01, 10.0, 1.30, 0.05, key="k2")
+        kelly_o = kelly_criterion(p_over15, c_bk_o)
+        st.markdown(kelly_html(kelly_o, c_bk_o > cote_o + SEUIL_VALUE), unsafe_allow_html=True)
+
+    # BTTS
+    with vd3:
+        cote_b = round(1 / pbtts, 2) if pbtts > 0 else 9.99
+        label_b = "OUI" if pbtts > SEUIL_BTTS else "NON"
+        badge_b = '<span class="badge-green">✅ BTTS OUI</span>' if pbtts > SEUIL_BTTS else '<span class="badge-red">❌ BTTS NON</span>'
+        st.markdown(
+            verdict_card_html("🎯 BTTS (2 marquent)", label_b, pbtts, badge_b,
+                              f"Cote algo BTTS : {cote_b}"),
+            unsafe_allow_html=True
+        )
+        c_bk_b = st.number_input("Cote bookmaker BTTS", 1.01, 10.0, 1.85, 0.05, key="k3")
+        kelly_b = kelly_criterion(pbtts, c_bk_b)
+        st.markdown(kelly_html(kelly_b, c_bk_b > cote_b + SEUIL_VALUE), unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════
+# TAB 2 — CLASSEMENT
+# ════════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="section-title">📊 Classement actuel</div>', unsafe_allow_html=True)
+    df = pd.DataFrame([{
+        "Rang":   e["position"],
+        "Équipe": e["team"]["name"],
+        "MJ":     e["playedGames"],
+        "V":      e.get("won", 0),
+        "N":      e.get("draw", 0),
+        "D":      e.get("lost", 0),
+        "Pts":    e["points"],
+        "Buts +": e["goalsFor"],
+        "Buts -": e["goalsAgainst"],
+        "Diff":   e["goalsFor"] - e["goalsAgainst"],
+        "Forme":  str(e.get("form", "") or "").replace(",", "")[-5:],
+    } for e in data_ligue])
+    st.dataframe(df, use_container_width=True, hide_index=True,
+                 column_config={"Diff": st.column_config.NumberColumn(format="%+d")})
+
+# ─── Footer ─────────────────────────────────────
 st.divider()
-st.caption("PRO-FOOT AI - Utilise la Loi de Poisson Bivariée pour estimer les probabilités sportives.")
+st.caption("PRO-FOOT AI V12 · Poisson Bivarié Normalisé · Kelly Criterion · football-data.org")
