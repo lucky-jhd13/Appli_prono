@@ -1,0 +1,294 @@
+{
+    "stats_par_match": [
+        {
+            "name": "Paris SG",
+            "played": 23,
+            "goals_pm": 2.26,
+            "xg_pm": 2.03,
+            "goals_total": 52,
+            "xg_total": 46.77
+        },
+        {
+            "name": "Lens",
+            "played": 23,
+            "goals_pm": 1.91,
+            "xg_pm": 1.93,
+            "goals_total": 44,
+            "xg_total": 44.5
+        },
+        {
+            "name": "Marseille",
+            "played": 23,
+            "goals_pm": 2.09,
+            "xg_pm": 1.8,
+            "goals_total": 48,
+            "xg_total": 41.47
+        },
+        {
+            "name": "Monaco",
+            "played": 23,
+            "goals_pm": 1.65,
+            "xg_pm": 1.73,
+            "goals_total": 38,
+            "xg_total": 39.87
+        },
+        {
+            "name": "Lille",
+            "played": 23,
+            "goals_pm": 1.57,
+            "xg_pm": 1.72,
+            "goals_total": 36,
+            "xg_total": 39.65
+        },
+        {
+            "name": "Strasbourg",
+            "played": 23,
+            "goals_pm": 1.7,
+            "xg_pm": 1.64,
+            "goals_total": 39,
+            "xg_total": 37.67
+        },
+        {
+            "name": "Lyon",
+            "played": 23,
+            "goals_pm": 1.61,
+            "xg_pm": 1.55,
+            "goals_total": 37,
+            "xg_total": 35.64
+        },
+        {
+            "name": "Rennes",
+            "played": 23,
+            "goals_pm": 1.61,
+            "xg_pm": 1.49,
+            "goals_total": 37,
+            "xg_total": 34.28
+        },
+        {
+            "name": "Brest",
+            "played": 23,
+            "goals_pm": 1.35,
+            "xg_pm": 1.44,
+            "goals_total": 31,
+            "xg_total": 33.16
+        },
+        {
+            "name": "Toulouse",
+            "played": 23,
+            "goals_pm": 1.43,
+            "xg_pm": 1.43,
+            "goals_total": 33,
+            "xg_total": 32.82
+        },
+        {
+            "name": "Lorient",
+            "played": 23,
+            "goals_pm": 1.39,
+            "xg_pm": 1.35,
+            "goals_total": 32,
+            "xg_total": 31.16
+        },
+        {
+            "name": "Nice",
+            "played": 23,
+            "goals_pm": 1.3,
+            "xg_pm": 1.32,
+            "goals_total": 30,
+            "xg_total": 30.47
+        },
+        {
+            "name": "Paris FC",
+            "played": 23,
+            "goals_pm": 1.17,
+            "xg_pm": 1.21,
+            "goals_total": 27,
+            "xg_total": 27.8
+        },
+        {
+            "name": "Le Havre",
+            "played": 23,
+            "goals_pm": 0.87,
+            "xg_pm": 1.12,
+            "goals_total": 20,
+            "xg_total": 25.67
+        },
+        {
+            "name": "Auxerre",
+            "played": 23,
+            "goals_pm": 0.74,
+            "xg_pm": 1.08,
+            "goals_total": 17,
+            "xg_total": 24.92
+        },
+        {
+            "name": "Metz",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 1.0,
+            "goals_total": 22,
+            "xg_total": 22.93
+        },
+        {
+            "name": "Nantes",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 1.0,
+            "goals_total": 22,
+            "xg_total": 22.92
+        },
+        {
+            "name": "Angers",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 0.94,
+            "goals_total": 22,
+            "xg_total": 21.72
+        }
+    ],
+    "stats_saison_totale": [
+        {
+            "name": "Paris SG",
+            "played": 23,
+            "goals_pm": 2.26,
+            "xg_pm": 2.03,
+            "goals_total": 52,
+            "xg_total": 46.77
+        },
+        {
+            "name": "Lens",
+            "played": 23,
+            "goals_pm": 1.91,
+            "xg_pm": 1.93,
+            "goals_total": 44,
+            "xg_total": 44.5
+        },
+        {
+            "name": "Marseille",
+            "played": 23,
+            "goals_pm": 2.09,
+            "xg_pm": 1.8,
+            "goals_total": 48,
+            "xg_total": 41.47
+        },
+        {
+            "name": "Monaco",
+            "played": 23,
+            "goals_pm": 1.65,
+            "xg_pm": 1.73,
+            "goals_total": 38,
+            "xg_total": 39.87
+        },
+        {
+            "name": "Lille",
+            "played": 23,
+            "goals_pm": 1.57,
+            "xg_pm": 1.72,
+            "goals_total": 36,
+            "xg_total": 39.65
+        },
+        {
+            "name": "Strasbourg",
+            "played": 23,
+            "goals_pm": 1.7,
+            "xg_pm": 1.64,
+            "goals_total": 39,
+            "xg_total": 37.67
+        },
+        {
+            "name": "Lyon",
+            "played": 23,
+            "goals_pm": 1.61,
+            "xg_pm": 1.55,
+            "goals_total": 37,
+            "xg_total": 35.64
+        },
+        {
+            "name": "Rennes",
+            "played": 23,
+            "goals_pm": 1.61,
+            "xg_pm": 1.49,
+            "goals_total": 37,
+            "xg_total": 34.28
+        },
+        {
+            "name": "Brest",
+            "played": 23,
+            "goals_pm": 1.35,
+            "xg_pm": 1.44,
+            "goals_total": 31,
+            "xg_total": 33.16
+        },
+        {
+            "name": "Toulouse",
+            "played": 23,
+            "goals_pm": 1.43,
+            "xg_pm": 1.43,
+            "goals_total": 33,
+            "xg_total": 32.82
+        },
+        {
+            "name": "Lorient",
+            "played": 23,
+            "goals_pm": 1.39,
+            "xg_pm": 1.35,
+            "goals_total": 32,
+            "xg_total": 31.16
+        },
+        {
+            "name": "Nice",
+            "played": 23,
+            "goals_pm": 1.3,
+            "xg_pm": 1.32,
+            "goals_total": 30,
+            "xg_total": 30.47
+        },
+        {
+            "name": "Paris FC",
+            "played": 23,
+            "goals_pm": 1.17,
+            "xg_pm": 1.21,
+            "goals_total": 27,
+            "xg_total": 27.8
+        },
+        {
+            "name": "Le Havre",
+            "played": 23,
+            "goals_pm": 0.87,
+            "xg_pm": 1.12,
+            "goals_total": 20,
+            "xg_total": 25.67
+        },
+        {
+            "name": "Auxerre",
+            "played": 23,
+            "goals_pm": 0.74,
+            "xg_pm": 1.08,
+            "goals_total": 17,
+            "xg_total": 24.92
+        },
+        {
+            "name": "Metz",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 1.0,
+            "goals_total": 22,
+            "xg_total": 22.93
+        },
+        {
+            "name": "Nantes",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 1.0,
+            "goals_total": 22,
+            "xg_total": 22.92
+        },
+        {
+            "name": "Angers",
+            "played": 23,
+            "goals_pm": 0.96,
+            "xg_pm": 0.94,
+            "goals_total": 22,
+            "xg_total": 21.72
+        }
+    ]
+}
