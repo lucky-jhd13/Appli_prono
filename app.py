@@ -40,11 +40,6 @@ def render_sidebar() -> tuple[str, bool]:
         st.divider()
         theme_clair = st.toggle("☀️ Mode Clair", value=False)
         
-        st.divider()
-        if st.button("🚪 Se déconnecter", use_container_width=True):
-            st.session_state["authentifie"] = False
-            st.rerun()
-
     return choix_ligue, theme_clair
 
 
@@ -205,37 +200,8 @@ def tab_classement(data_ligue: list):
     )
 
 
-def check_password() -> bool:
-    """Gère l'écran de connexion Streamlit."""
-    if "authentifie" not in st.session_state:
-        st.session_state["authentifie"] = False
-
-    if not st.session_state["authentifie"]:
-        st.markdown("<br><br><br><h1 style='text-align: center;'>🔐 PRO-FOOT AI V12</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: gray;'>Veuillez vous identifier pour accéder au moteur algorithmique</p>", unsafe_allow_html=True)
-        
-        _, col, _ = st.columns([1, 1.5, 1])
-        with col:
-            with st.container(border=True):
-                user = st.text_input("👤 Identifiant")
-                pwd = st.text_input("🔑 Mot de passe", type="password")
-                if st.button("Se connecter", use_container_width=True, type="primary"):
-                    # ⚠️ IDENTIFIANTS : Tu peux les changer ici !
-                    if user == "admin" and pwd == "prono123":
-                        st.session_state["authentifie"] = True
-                        st.rerun()
-                    else:
-                        st.error("Identifiant ou mot de passe incorrect.")
-        return False
-    return True
-
-
 # ─── Logique principale ─────────────────────────
 def main():
-    # 1. Vérification du mot de passe
-    if not check_password():
-        return
-        
     choix_ligue, theme_clair = render_sidebar()
     c = get_couleurs(theme_clair)
     injecter_css(c)
