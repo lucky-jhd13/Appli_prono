@@ -8,13 +8,62 @@ import numpy as np
 import pandas as pd
 import sys
 import os
+from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Charger les variables d'environnement locales (.env)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from core.engine_v3 import FootballEngineV3, EloSystem
 from core.value_betting import ValueBetDetector, KellyCalculator, ConfidenceScorer
 from core.bankroll import BankrollTracker, BacktestEngine
 from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL
+
+
+@st.cache_data(ttl=3600)  # Cache 1h pour ne pas exploser le quota API
+def load_live_matches(target_date_str: str) -> list:
+    """
+    Charge les matchs réels depuis API-Football pour la date donnée.
+    Retourne une liste vide si l'API est indisponible.
+    """
+    try:
+        from core.api_client import FootballAPIClient
+        from core.data_mapper import map_fixture_to_match
+        from datetime import date as dt_date
+        import time
+
+        api_key = os.environ.get("API_FOOTBALL_KEY") or st.secrets.get("API_FOOTBALL_KEY", "")
+        if not api_key:
+            return []
+
+        client = FootballAPIClient(api_key=api_key)
+        target_date = dt_date.fromisoformat(target_date_str)
+        fixtures = client.get_fixtures(target_date)
+
+        if not fixtures:
+            return []
+
+        matches = []
+        for i, fix in enumerate(fixtures[:20]):  # Max 20 matchs pour limiter les requêtes
+            fixture_id = fix.get("fixture", {}).get("id", 0)
+            # Petite pause pour respecter le rate limit (300 req/min)
+            if i > 0 and i % 5 == 0:
+                time.sleep(0.5)
+            try:
+                odds = client.get_odds(fixture_id)
+            except Exception:
+                odds = {}
+            match = map_fixture_to_match(fix, odds)
+            matches.append(match)
+
+        return matches
+    except Exception as e:
+        return []
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -441,6 +490,23 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     st.divider()
+
+    # ── MODE LIVE / DÉMO ──
+    st.markdown("**📡 Source des données**")
+    live_mode = st.toggle("🔴 Mode Live (API réelle)", value=False)
+    if live_mode:
+        selected_date = st.date_input(
+            "📅 Date",
+            value=date.today(),
+            min_value=date.today() - timedelta(days=3),
+            max_value=date.today() + timedelta(days=2),
+        )
+        st.caption("Données chargées depuis API-Football")
+    else:
+        selected_date = date.today()
+        st.caption("🎭 Mode Démo — données simulées")
+    st.divider()
+
     st.markdown("**💰 Bankroll**")
     bankroll = st.number_input("Montant (€)", min_value=10.0, max_value=100000.0,
                                 value=st.session_state.bankroll, step=50.0)
@@ -471,7 +537,18 @@ detector = get_detector()
 detector.kelly.kelly_fraction = kelly_frac
 detector.kelly.max_bet_pct = max_bet / 100
 
-filtered_matches = DEMO_MATCHES
+# ── Chargement des matchs (Live ou Démo) ──
+if live_mode:
+    with st.spinner("📡 Chargement des matchs en direct depuis API-Football..."):
+        live_matches = load_live_matches(selected_date.isoformat())
+    if live_matches:
+        filtered_matches = live_matches
+        st.sidebar.success(f"✅ {len(live_matches)} match(s) chargé(s) en live")
+    else:
+        filtered_matches = DEMO_MATCHES
+        st.sidebar.warning("⚠️ API indisponible — Mode Démo activé en fallback")
+else:
+    filtered_matches = DEMO_MATCHES
 
 all_predictions = {}
 all_value_bets = []
