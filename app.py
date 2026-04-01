@@ -896,7 +896,7 @@ with tab6:
         with oc1: c_odd_home = st.number_input("Cote 1", 1.01, 20.0, 2.00, 0.05, key="c_odd_h")
         with oc2: c_odd_draw = st.number_input("Cote X", 1.01, 20.0, 3.40, 0.05, key="c_odd_d")
         with oc3: c_odd_away = st.number_input("Cote 2", 1.01, 20.0, 3.50, 0.05, key="c_odd_a")
-        with oc4: c_odd_o25  = st.number_input("O2.5",  1.01, 10.0, 1.90, 0.05, key="c_odd_o")
+        with oc4: c_odd_o15  = st.number_input("O1.5",  1.01, 10.0, 1.30, 0.05, key="c_odd_o")
         with oc5: c_odd_btts = st.number_input("BTTS+", 1.01, 10.0, 1.80, 0.05, key="c_odd_b")
     
     st.markdown("")
@@ -1032,13 +1032,13 @@ with tab6:
         # ── Value Bets ──
         custom_odds = {
             'home_win': c_odd_home, 'draw': c_odd_draw, 'away_win': c_odd_away,
-            'over_2.5': c_odd_o25, 'btts_yes': c_odd_btts,
-            'under_2.5': round(1 / max(1 - 1/c_odd_o25, 0.01), 2),
+            'over_1.5': c_odd_o15, 'btts_yes': c_odd_btts,
+            'under_1.5': round(1 / max(1 - 1/c_odd_o15, 0.01), 2),
             'btts_no':   round(1 / max(1 - 1/c_odd_btts, 0.01), 2),
         }
         custom_probs = {
             'home_win': cp['home_win'], 'draw': cp['draw'], 'away_win': cp['away_win'],
-            'over_2.5': cp['over_2.5'], 'under_2.5': cp['under_2.5'],
+            'over_1.5': cp['over_1.5'], 'under_1.5': 1 - cp['over_1.5'],
             'btts_yes': cp['btts_yes'], 'btts_no': cp['btts_no'],
         }
         custom_vbs = detector.analyze_match(
