@@ -1082,35 +1082,6 @@ with tab6:
 
 
 
-
-    # ── Team Names ──
-    col_t1, col_vs, col_t2 = st.columns([5, 1, 5])
-
-    # Utiliser la base LEAGUE_TEAMS en priorité, sinon les matchs démo
-    if custom_league == 'Toutes':
-        all_teams_flat = []
-        for teams in LEAGUE_TEAMS.values():
-            all_teams_flat.extend(teams)
-        available_teams = sorted(list(set(all_teams_flat)))
-    else:
-        available_teams = LEAGUE_TEAMS.get(custom_league, [])
-        # Fallback: ajouter les équipes des matchs démo si la liste est vide
-        if not available_teams:
-            tab6_matches_demo = [m for m in DEMO_MATCHES if m['league'] == custom_league]
-            available_teams = sorted(list(set(
-                [m['home'] for m in tab6_matches_demo] + [m['away'] for m in tab6_matches_demo]
-            )))
-
-    if not available_teams:
-        available_teams = ["PSG", "Marseille"]
-        
-    with col_t1:
-        custom_home = st.selectbox("🏠 Équipe Domicile", options=available_teams, index=0, key="custom_home")
-    with col_vs:
-        st.markdown('<div style="text-align:center; padding-top:1.8rem; font-size:1.5rem; font-weight:700; color:#8892a4;">VS</div>', unsafe_allow_html=True)
-    with col_t2:
-        custom_away = st.selectbox("✈️ Équipe Extérieur", options=available_teams, index=1 if len(available_teams) > 1 else 0, key="custom_away")
-
 # Footer
 st.markdown("""
 <div style="text-align:center; padding:2rem; color:#8892a4; font-size:0.75rem; border-top:1px solid #2a3a52; margin-top:2rem;">
