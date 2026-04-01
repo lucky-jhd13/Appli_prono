@@ -76,6 +76,20 @@ st.markdown("""
     section[data-testid="stSidebar"] * {
         color: var(--text-primary) !important;
     }
+    /* Fix top cutoff */
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 3.5rem !important;
+    }
+
+    /* Enlarge collapse/expand arrows */
+    button[data-testid="collapsedControl"] {
+        transform: scale(1.4);
+        margin-left: 10px;
+    }
+    button[kind="header"] {
+        transform: scale(1.4);
+    }
+
     section[data-testid="stSidebar"] .stSlider > div > div > div {
         background: var(--bg-card) !important;
     }
@@ -120,14 +134,15 @@ st.markdown("""
         padding: 6px !important;
         gap: 6px !important;
         border: 1px solid var(--border) !important;
+        flex-wrap: wrap !important; /* Force wrap so Mon Match is always visible without arrows */
     }
     .stTabs [data-baseweb="tab"] {
         color: var(--text-secondary) !important;
         font-family: 'Space Grotesk', sans-serif !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
         border-radius: 8px !important;
-        padding: 10px 20px !important;
+        padding: 8px 16px !important;
         background: transparent !important;
         border: none !important;
         transition: all 0.2s ease !important;
@@ -142,6 +157,7 @@ st.markdown("""
         border: 1px solid var(--accent-green) !important;
         box-shadow: 0 0 12px rgba(0,214,143,0.15) !important;
     }
+
     .stTabs [data-baseweb="tab-panel"] {
         background: transparent !important;
         border: none !important;
