@@ -448,8 +448,6 @@ with st.sidebar:
         st.session_state.bankroll = bankroll
     st.divider()
     st.markdown("**🔧 Filtres**")
-    leagues = ['Toutes'] + list(set(m['league'] for m in DEMO_MATCHES))
-    selected_league = st.selectbox("Ligue", leagues)
     min_conf = st.slider("Confiance min", 0, 100, 50, 5)
     min_edge_pct = st.slider("Edge min (%)", 0, 20, 3, 1)
     st.divider()
@@ -474,8 +472,6 @@ detector.kelly.kelly_fraction = kelly_frac
 detector.kelly.max_bet_pct = max_bet / 100
 
 filtered_matches = DEMO_MATCHES
-if selected_league != 'Toutes':
-    filtered_matches = [m for m in DEMO_MATCHES if m['league'] == selected_league]
 
 all_predictions = {}
 all_value_bets = []
@@ -785,11 +781,17 @@ with tab6:
     st.markdown('<div class="section-header">⚽ Analyse Personnalisée</div>', unsafe_allow_html=True)
     st.markdown('<div style="color:#8892a4; font-size:0.85rem; margin-bottom:1rem;">Entrez les paramètres de votre match pour obtenir une analyse complète avec détection de value bets.</div>', unsafe_allow_html=True)
 
+    # ── League Selection ──
+    tab6_leagues = ['Toutes'] + list(set(m['league'] for m in DEMO_MATCHES))
+    custom_league = st.selectbox("🇪🇺 Filtrer par Ligue", options=tab6_leagues, index=0)
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # ── Team Names ──
     col_t1, col_vs, col_t2 = st.columns([5, 1, 5])
     
+    tab6_matches = DEMO_MATCHES if custom_league == 'Toutes' else [m for m in DEMO_MATCHES if m['league'] == custom_league]
     available_teams = sorted(list(set(
-        [m['home'] for m in filtered_matches] + [m['away'] for m in filtered_matches]
+        [m['home'] for m in tab6_matches] + [m['away'] for m in tab6_matches]
     )))
     if not available_teams:
         available_teams = ["PSG", "Marseille"]
