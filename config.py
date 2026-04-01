@@ -72,6 +72,39 @@ DEMO_MATCHES = [
         'odds': {'home_win': 2.50, 'draw': 3.10, 'away_win': 2.90,
                  'over_2.5': 2.10, 'under_2.5': 1.72, 'btts_yes': 1.82, 'btts_no': 1.95}
     },
+    {
+        'id': 6, 'home': 'Real Madrid', 'away': 'Man City', 'league': 'Ligue des Champions',
+        'date': '2025-05-01 21:00',
+        'home_attack': 2.30, 'home_defense': 1.85, 'away_attack': 2.50, 'away_defense': 1.95,
+        'home_xg': 2.15, 'away_xg': 2.25, 'home_elo': 1900, 'away_elo': 1950,
+        'home_form': [(3,1),(2,0),(1,1),(2,2),(4,0)],
+        'away_form': [(2,2),(3,0),(1,1),(4,1),(2,0)],
+        'home_rest': 6, 'away_rest': 5, 'home_absent': 0, 'away_absent': 1,
+        'odds': {'home_win': 2.60, 'draw': 3.40, 'away_win': 2.50,
+                 'over_2.5': 1.65, 'under_2.5': 2.10, 'btts_yes': 1.55, 'btts_no': 2.30}
+    },
+    {
+        'id': 7, 'home': 'Liverpool', 'away': 'Leverkusen', 'league': 'Europa League',
+        'date': '2025-05-02 21:00',
+        'home_attack': 2.45, 'home_defense': 1.80, 'away_attack': 2.20, 'away_defense': 1.70,
+        'home_xg': 2.30, 'away_xg': 1.90, 'home_elo': 1850, 'away_elo': 1780,
+        'home_form': [(2,0),(3,1),(2,1),(1,1),(3,0)],
+        'away_form': [(1,1),(2,0),(2,2),(3,1),(1,0)],
+        'home_rest': 7, 'away_rest': 6, 'home_absent': 1, 'away_absent': 0,
+        'odds': {'home_win': 1.95, 'draw': 3.70, 'away_win': 3.50,
+                 'over_2.5': 1.55, 'under_2.5': 2.30, 'btts_yes': 1.50, 'btts_no': 2.40}
+    },
+    {
+        'id': 8, 'home': 'France', 'away': 'Argentine', 'league': 'Coupe du Monde',
+        'date': '2026-07-15 20:00',
+        'home_attack': 2.35, 'home_defense': 2.10, 'away_attack': 2.25, 'away_defense': 2.05,
+        'home_xg': 2.10, 'away_xg': 2.00, 'home_elo': 2050, 'away_elo': 2080,
+        'home_form': [(2,0),(1,0),(3,1),(1,1),(2,0)],
+        'away_form': [(1,0),(2,0),(1,1),(2,1),(3,0)],
+        'home_rest': 5, 'away_rest': 6, 'home_absent': 0, 'away_absent': 0,
+        'odds': {'home_win': 2.70, 'draw': 3.10, 'away_win': 2.70,
+                 'over_2.5': 2.10, 'under_2.5': 1.70, 'btts_yes': 1.85, 'btts_no': 1.90}
+    },
 ]
 
 DEMO_HISTORICAL = [
