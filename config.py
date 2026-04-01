@@ -16,6 +16,60 @@ APP_CONFIG = {
     'max_goals_matrix': 8,
 }
 
+# ─────────────────────────────────────────────
+# BASE D'ÉQUIPES PAR COMPÉTITION
+# ─────────────────────────────────────────────
+LEAGUE_TEAMS = {
+    'Ligue 1': [
+        'PSG', 'Marseille', 'Monaco', 'Lyon', 'Lens', 'Nice', 'Lille', 'Rennes',
+        'Montpellier', 'Strasbourg', 'Nantes', 'Brest', 'Toulouse', 'Reims',
+        'Lorient', 'Metz', 'Clermont', 'Le Havre', 'Auxerre', 'Saint-Étienne',
+    ],
+    'Premier League': [
+        'Manchester City', 'Arsenal', 'Liverpool', 'Chelsea', 'Manchester United',
+        'Tottenham', 'Newcastle', 'Aston Villa', 'Brighton', 'West Ham',
+        'Brentford', 'Fulham', 'Crystal Palace', 'Wolves', 'Everton',
+        'Nottingham Forest', 'Bournemouth', 'Luton', 'Sheffield United', 'Burnley',
+    ],
+    'La Liga': [
+        'Real Madrid', 'Barcelona', 'Atletico Madrid', 'Sevilla', 'Real Sociedad',
+        'Villarreal', 'Athletic Bilbao', 'Valencia', 'Betis', 'Osasuna',
+        'Celta Vigo', 'Girona', 'Getafe', 'Rayo Vallecano', 'Cadiz',
+        'Almeria', 'Mallorca', 'Las Palmas', 'Alaves', 'Granada',
+    ],
+    'Bundesliga': [
+        'Bayern Munich', 'Dortmund', 'Leverkusen', 'RB Leipzig', 'Union Berlin',
+        'Freiburg', 'Hoffenheim', 'Eintracht Frankfurt', 'Wolfsburg', 'Mainz',
+        'Borussia Mönchengladbach', 'Augsburg', 'Werder Bremen', 'Bochum',
+        'Stuttgart', 'Cologne', 'Heidenheim', 'Darmstadt',
+    ],
+    'Serie A': [
+        'Inter Milan', 'AC Milan', 'Juventus', 'Napoli', 'Roma', 'Lazio',
+        'Atalanta', 'Fiorentina', 'Bologna', 'Torino', 'Sassuolo', 'Monza',
+        'Udinese', 'Lecce', 'Frosinone', 'Empoli', 'Cagliari', 'Genoa',
+        'Salernitana', 'Hellas Verona',
+    ],
+    'Ligue des Champions': [
+        'Real Madrid', 'Manchester City', 'Bayern Munich', 'PSG', 'Barcelona',
+        'Liverpool', 'Chelsea', 'Arsenal', 'Dortmund', 'Atletico Madrid',
+        'Inter Milan', 'AC Milan', 'Porto', 'Benfica', 'Ajax',
+        'Napoli', 'RB Leipzig', 'Leverkusen', 'Braga', 'Shakhtar Donetsk',
+    ],
+    'Europa League': [
+        'Liverpool', 'Leverkusen', 'Roma', 'Villarreal', 'Sevilla',
+        'Arsenal', 'Manchester United', 'Tottenham', 'West Ham', 'Fiorentina',
+        'Atalanta', 'Lyon', 'Marseille', 'Lazio', 'Slavia Prague',
+        'Sporting CP', 'Fenerbahce', 'Galatasaray', 'Rangers', 'Ajax',
+    ],
+    'Coupe du Monde': [
+        'France', 'Argentine', 'Brésil', 'Espagne', 'Angleterre', 'Allemagne',
+        'Portugal', 'Pays-Bas', 'Belgique', 'Italie', 'Uruguay', 'Croatie',
+        'Maroc', 'Sénégal', 'Japon', 'États-Unis', 'Mexique', 'Canada',
+        'Australie', 'Corée du Sud', 'Pologne', 'Suisse', 'Danemark', 'Serbie',
+    ],
+    'Toutes': [],  # Géré dynamiquement dans l'app
+}
+
 DEMO_MATCHES = [
     {
         'id': 1, 'home': 'PSG', 'away': 'Marseille', 'league': 'Ligue 1',

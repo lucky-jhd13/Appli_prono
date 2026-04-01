@@ -22,7 +22,7 @@ except ImportError:
 from core.engine_v3 import FootballEngineV3, EloSystem
 from core.value_betting import ValueBetDetector, KellyCalculator, ConfidenceScorer
 from core.bankroll import BankrollTracker, BacktestEngine
-from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL
+from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL, LEAGUE_TEAMS
 
 
 @st.cache_data(ttl=3600)  # Cache 1h pour ne pas exploser le quota API
@@ -859,17 +859,29 @@ with tab6:
     st.markdown('<div style="color:#8892a4; font-size:0.85rem; margin-bottom:1rem;">Entrez les paramètres de votre match pour obtenir une analyse complète avec détection de value bets.</div>', unsafe_allow_html=True)
 
     # ── League Selection ──
-    tab6_leagues = ['Toutes'] + list(set(m['league'] for m in DEMO_MATCHES))
-    custom_league = st.selectbox("🇪🇺 Filtrer par Ligue", options=tab6_leagues, index=0)
+    all_league_keys = [k for k in LEAGUE_TEAMS.keys() if k != 'Toutes']
+    tab6_leagues = ['Toutes'] + sorted(all_league_keys)
+    custom_league = st.selectbox("🇪🇺 Filtrer par Ligue / Compétition", options=tab6_leagues, index=0)
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Team Names ──
     col_t1, col_vs, col_t2 = st.columns([5, 1, 5])
-    
-    tab6_matches = DEMO_MATCHES if custom_league == 'Toutes' else [m for m in DEMO_MATCHES if m['league'] == custom_league]
-    available_teams = sorted(list(set(
-        [m['home'] for m in tab6_matches] + [m['away'] for m in tab6_matches]
-    )))
+
+    # Utiliser la base LEAGUE_TEAMS en priorité, sinon les matchs démo
+    if custom_league == 'Toutes':
+        all_teams_flat = []
+        for teams in LEAGUE_TEAMS.values():
+            all_teams_flat.extend(teams)
+        available_teams = sorted(list(set(all_teams_flat)))
+    else:
+        available_teams = LEAGUE_TEAMS.get(custom_league, [])
+        # Fallback: ajouter les équipes des matchs démo si la liste est vide
+        if not available_teams:
+            tab6_matches_demo = [m for m in DEMO_MATCHES if m['league'] == custom_league]
+            available_teams = sorted(list(set(
+                [m['home'] for m in tab6_matches_demo] + [m['away'] for m in tab6_matches_demo]
+            )))
+
     if not available_teams:
         available_teams = ["PSG", "Marseille"]
         
