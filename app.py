@@ -896,7 +896,7 @@ with tab6:
         with oc1: c_odd_home = st.number_input("Cote 1", 1.01, 20.0, 2.00, 0.05, key="c_odd_h")
         with oc2: c_odd_draw = st.number_input("Cote X", 1.01, 20.0, 3.40, 0.05, key="c_odd_d")
         with oc3: c_odd_away = st.number_input("Cote 2", 1.01, 20.0, 3.50, 0.05, key="c_odd_a")
-        with oc4: c_odd_o15  = st.number_input("O1.5",  1.01, 10.0, 1.30, 0.05, key="c_odd_o")
+        with oc4: c_odd_o15  = st.number_input("1.5",  1.01, 10.0, 1.30, 0.05, key="c_odd_o")
         with oc5: c_odd_btts = st.number_input("BTTS+", 1.01, 10.0, 1.80, 0.05, key="c_odd_b")
     
     st.markdown("")
