@@ -1,42 +1,98 @@
-# ─────────────────────────────────────────────
-# config.py — Constantes & configuration globale
-# ─────────────────────────────────────────────
+"""
+PRO-FOOT AI V3 — Configuration & Données de démonstration
+"""
 
-from typing import Dict
-
-# ── API ──────────────────────────────────────
-API_KEY: str = "6845fbe629e041bdb8f0cad7488a9fe2"
-
-# ── Compétitions supportées ──────────────────
-CHAMPIONNATS: Dict[str, str] = {
-    "🇪🇺 Champions League": "CL",
-    "🇪🇺 Europa League": "EL",
-    "🇫🇷 Ligue 1":          "FL1",
-    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "PL",
-    "🇪🇸 La Liga":           "PD",
-    "🇩🇪 Bundesliga":        "BL1",
-    "🇮🇹 Serie A":           "SA",
-    "🇳🇱 Eredivisie":        "DED",
+APP_CONFIG = {
+    'app_name': 'PRO-FOOT AI V3',
+    'version': '3.0.0',
+    'initial_bankroll': 1000.0,
+    'kelly_fraction': 0.25,
+    'max_bet_pct': 0.05,
+    'min_edge': 0.03,
+    'min_confidence': 50.0,
+    'rho': -0.13,
+    'home_advantage_xg': 0.25,
+    'league_avg_goals': 1.40,
+    'max_goals_matrix': 8,
 }
 
-# ── Modèle Poisson ───────────────────────────
-# Nombre de buts max dans la matrice de probabilités
-MAX_BUTS_MATRICE: int = 8
+DEMO_MATCHES = [
+    {
+        'id': 1, 'home': 'PSG', 'away': 'Marseille', 'league': 'Ligue 1',
+        'date': '2025-04-15 20:45',
+        'home_attack': 2.10, 'home_defense': 1.82, 'away_attack': 1.65, 'away_defense': 1.45,
+        'home_xg': 1.85, 'away_xg': 1.10, 'home_elo': 1750, 'away_elo': 1640,
+        'home_form': [(3,1),(2,0),(1,1),(2,2),(4,0)],
+        'away_form': [(1,1),(2,1),(0,2),(1,0),(1,3)],
+        'home_rest': 5, 'away_rest': 7, 'home_absent': 1, 'away_absent': 0,
+        'odds': {'home_win': 1.72, 'draw': 3.80, 'away_win': 4.50,
+                 'over_2.5': 1.85, 'under_2.5': 1.95, 'btts_yes': 1.75, 'btts_no': 2.05}
+    },
+    {
+        'id': 2, 'home': 'Bayern Munich', 'away': 'Dortmund', 'league': 'Bundesliga',
+        'date': '2025-04-15 18:30',
+        'home_attack': 2.40, 'home_defense': 1.95, 'away_attack': 1.90, 'away_defense': 1.60,
+        'home_xg': 2.20, 'away_xg': 1.40, 'home_elo': 1820, 'away_elo': 1690,
+        'home_form': [(4,0),(3,1),(2,0),(5,2),(2,1)],
+        'away_form': [(2,2),(1,0),(3,1),(1,2),(2,0)],
+        'home_rest': 7, 'away_rest': 4, 'home_absent': 0, 'away_absent': 2,
+        'odds': {'home_win': 1.55, 'draw': 4.20, 'away_win': 5.50,
+                 'over_2.5': 1.60, 'under_2.5': 2.30, 'btts_yes': 1.68, 'btts_no': 2.10}
+    },
+    {
+        'id': 3, 'home': 'Arsenal', 'away': 'Chelsea', 'league': 'Premier League',
+        'date': '2025-04-16 16:00',
+        'home_attack': 1.95, 'home_defense': 1.75, 'away_attack': 1.80, 'away_defense': 1.68,
+        'home_xg': 1.70, 'away_xg': 1.35, 'home_elo': 1710, 'away_elo': 1695,
+        'home_form': [(2,1),(1,1),(3,0),(1,2),(2,1)],
+        'away_form': [(1,2),(2,0),(1,1),(0,1),(2,2)],
+        'home_rest': 6, 'away_rest': 6, 'home_absent': 1, 'away_absent': 1,
+        'odds': {'home_win': 2.10, 'draw': 3.40, 'away_win': 3.50,
+                 'over_2.5': 1.95, 'under_2.5': 1.85, 'btts_yes': 1.72, 'btts_no': 2.05}
+    },
+    {
+        'id': 4, 'home': 'Real Madrid', 'away': 'Atletico Madrid', 'league': 'La Liga',
+        'date': '2025-04-16 21:00',
+        'home_attack': 2.20, 'home_defense': 1.88, 'away_attack': 1.55, 'away_defense': 1.35,
+        'home_xg': 1.95, 'away_xg': 1.05, 'home_elo': 1800, 'away_elo': 1720,
+        'home_form': [(3,0),(2,1),(1,0),(4,1),(2,0)],
+        'away_form': [(1,0),(0,0),(2,1),(1,1),(1,0)],
+        'home_rest': 7, 'away_rest': 7, 'home_absent': 0, 'away_absent': 0,
+        'odds': {'home_win': 1.95, 'draw': 3.60, 'away_win': 4.00,
+                 'over_2.5': 2.00, 'under_2.5': 1.80, 'btts_yes': 1.78, 'btts_no': 2.00}
+    },
+    {
+        'id': 5, 'home': 'Juventus', 'away': 'Inter Milan', 'league': 'Serie A',
+        'date': '2025-04-17 20:45',
+        'home_attack': 1.70, 'home_defense': 1.72, 'away_attack': 1.85, 'away_defense': 1.80,
+        'home_xg': 1.45, 'away_xg': 1.50, 'home_elo': 1675, 'away_elo': 1700,
+        'home_form': [(1,1),(1,2),(0,0),(2,1),(1,0)],
+        'away_form': [(2,0),(3,1),(1,0),(2,2),(2,0)],
+        'home_rest': 7, 'away_rest': 5, 'home_absent': 2, 'away_absent': 1,
+        'odds': {'home_win': 2.50, 'draw': 3.10, 'away_win': 2.90,
+                 'over_2.5': 2.10, 'under_2.5': 1.72, 'btts_yes': 1.82, 'btts_no': 1.95}
+    },
+]
 
-# Seuils de décision algorithmique
-SEUIL_BTTS: float   = 0.50   # > 50% → BTTS OUI
-SEUIL_OVER15: float = 0.52   # > 52% → Over 1.5
-SEUIL_VALUE: float  = 0.15   # écart min cote_book - cote_algo pour déclarer une "Value"
-
-# Modificateurs d'avantage domicile
-DOM_BONUS_BASE: float = 1.05
-DOM_BONUS_MAX: float  = 0.12  # +12% max selon performances à domicile (dynamique)
-
-# Modificateurs de forme sur 5 matchs (±8%)
-FORME_MIN: float   = 0.96
-FORME_RANGE: float = 0.08
-
-# Modificateurs d'effectif et de calendrier
-BUTEUR_ABSENT_MULT: float = 0.78  # Impact de l'absence du buteur principal
-REPOS_ELEVE_MULT: float   = 1.06  # Avantage si >= 5 jours de repos
-REPOS_FAIBLE_MULT: float  = 0.88  # Malus si <= 2 jours de repos
+DEMO_HISTORICAL = [
+    {'model_prob': 0.52, 'odd': 2.10, 'outcome': 1, 'confidence_score': 72, 'edge': 0.05},
+    {'model_prob': 0.65, 'odd': 1.75, 'outcome': 1, 'confidence_score': 81, 'edge': 0.08},
+    {'model_prob': 0.48, 'odd': 2.30, 'outcome': 0, 'confidence_score': 55, 'edge': 0.04},
+    {'model_prob': 0.71, 'odd': 1.60, 'outcome': 1, 'confidence_score': 85, 'edge': 0.09},
+    {'model_prob': 0.44, 'odd': 2.50, 'outcome': 1, 'confidence_score': 63, 'edge': 0.05},
+    {'model_prob': 0.58, 'odd': 1.95, 'outcome': 0, 'confidence_score': 68, 'edge': 0.06},
+    {'model_prob': 0.63, 'odd': 1.80, 'outcome': 1, 'confidence_score': 77, 'edge': 0.07},
+    {'model_prob': 0.38, 'odd': 3.00, 'outcome': 0, 'confidence_score': 48, 'edge': 0.05},
+    {'model_prob': 0.55, 'odd': 2.00, 'outcome': 1, 'confidence_score': 71, 'edge': 0.05},
+    {'model_prob': 0.70, 'odd': 1.65, 'outcome': 1, 'confidence_score': 88, 'edge': 0.12},
+    {'model_prob': 0.42, 'odd': 2.70, 'outcome': 0, 'confidence_score': 52, 'edge': 0.04},
+    {'model_prob': 0.60, 'odd': 1.90, 'outcome': 1, 'confidence_score': 74, 'edge': 0.06},
+    {'model_prob': 0.49, 'odd': 2.20, 'outcome': 0, 'confidence_score': 58, 'edge': 0.04},
+    {'model_prob': 0.66, 'odd': 1.72, 'outcome': 1, 'confidence_score': 82, 'edge': 0.09},
+    {'model_prob': 0.53, 'odd': 2.05, 'outcome': 1, 'confidence_score': 69, 'edge': 0.05},
+    {'model_prob': 0.75, 'odd': 1.55, 'outcome': 1, 'confidence_score': 91, 'edge': 0.14},
+    {'model_prob': 0.41, 'odd': 2.80, 'outcome': 1, 'confidence_score': 50, 'edge': 0.03},
+    {'model_prob': 0.57, 'odd': 1.98, 'outcome': 0, 'confidence_score': 66, 'edge': 0.06},
+    {'model_prob': 0.62, 'odd': 1.85, 'outcome': 1, 'confidence_score': 78, 'edge': 0.08},
+    {'model_prob': 0.47, 'odd': 2.35, 'outcome': 0, 'confidence_score': 54, 'edge': 0.04},
+]

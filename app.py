@@ -1,232 +1,978 @@
-# ─────────────────────────────────────────────
-# app.py — Point d'entrée principal (orchestrateur)
-# Lance avec : streamlit run app.py
-# ─────────────────────────────────────────────
+"""
+PRO-FOOT AI V3 — Interface Streamlit Premium
+Dashboard professionnel de pronostics football
+"""
 
 import streamlit as st
+import numpy as np
 import pandas as pd
+import sys
+import os
 
-from config import CHAMPIONNATS, SEUIL_BTTS, SEUIL_OVER15, SEUIL_VALUE
-from core.api import charger_classement, moyenne_buts_ligue
-from core.stats import extraire_stats
-from core.moteur import (
-    calculer_lambdas, matrice_scores,
-    probabilites_depuis_matrice, score_le_plus_probable,
-    kelly_criterion
+sys.path.insert(0, os.path.dirname(__file__))
+
+from core.engine_v3 import FootballEngineV3, EloSystem
+from core.value_betting import ValueBetDetector, KellyCalculator, ConfidenceScorer
+from core.bankroll import BankrollTracker, BacktestEngine
+from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL
+
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="PRO-FOOT AI V3",
+    page_icon="⚽",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
-from style import get_couleurs, injecter_css, couleur_prob
-from ui.composants import (
-    match_header_html, stat_grid_html,
-    verdict_card_html, kelly_html,
-)
-from ui.graphiques import fig_radar, fig_barres, fig_heatmap, fig_jauge
 
-# ─── Config page ────────────────────────────────
-st.set_page_config(page_title="PRO-FOOT AI V12", page_icon="🏆", layout="wide")
+# ─────────────────────────────────────────────
+# CSS PREMIUM
+# ─────────────────────────────────────────────
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap');
+    :root {
+        --bg-primary: #0a0e1a; --bg-secondary: #111827; --bg-card: #1a2235;
+        --accent-green: #00d68f; --accent-gold: #f5a623; --accent-red: #ff4d6d;
+        --accent-blue: #4facfe; --text-primary: #e8ecf0; --text-secondary: #8892a4;
+        --border: #2a3a52;
+    }
 
+    /* ══ GLOBAL RESET ══ */
+    .stApp, .stApp > header, .main .block-container {
+        background: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        font-family: 'Space Grotesk', sans-serif;
+    }
+    .block-container { padding-top: 3.5rem !important; padding-left: 2rem; padding-right: 2rem; padding-bottom: 1rem; }
 
-# ─── Composants modulaires Streamlit ────────────
-def render_sidebar() -> tuple[str, bool]:
-    """Gère l'affichage de la barre latérale et retourne les champs."""
-    with st.sidebar:
-        st.markdown("### ⚙️ RÉGLAGES")
-        choix_ligue = st.selectbox("🏆 CHAMPIONNAT", list(CHAMPIONNATS.keys()))
-        
-        st.divider()
-        if st.button("🔄 ACTUALISER LES DONNÉES", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+    /* ══ STREAMLIT HEADER/TOOLBAR — hide white bar ══ */
+    header[data-testid="stHeader"],
+    .stApp > header {
+        background: var(--bg-primary) !important;
+        border-bottom: none !important;
+        box-shadow: none !important;
+    }
+    .stDeployButton, div[data-testid="stToolbar"],
+    div[data-testid="stStatusWidget"] {
+        background: transparent !important;
+        color: var(--text-secondary) !important;
+    }
+    div[data-testid="stDecoration"] {
+        display: none !important;
+    }
 
-        st.divider()
-        theme_clair = st.toggle("☀️ Mode Clair", value=False)
-        
-    return choix_ligue, theme_clair
+    /* Kill ALL white borders globally */
+    *, *::before, *::after {
+        border-color: var(--border) !important;
+    }
 
+    /* ══ SIDEBAR ══ */
+    section[data-testid="stSidebar"] {
+        background: var(--bg-secondary) !important;
+        border-right: 1px solid var(--border) !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: var(--text-primary) !important;
+    }
+    section[data-testid="stSidebar"] .stSlider > div > div > div {
+        background: var(--bg-card) !important;
+    }
 
-def tab_analyse(data_ligue: list, moy_gf: float, c: dict):
-    """Gère l'affichage complet de l'onglet d'analyse."""
-    equipes = sorted([e["team"]["name"] for e in data_ligue])
+    /* ══ COLUMNS & CONTAINERS — kill white borders ══ */
+    div[data-testid="stVerticalBlock"],
+    div[data-testid="stHorizontalBlock"],
+    div[data-testid="column"],
+    .stColumn,
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* ══ METRIC CARDS ══ */
+    div[data-testid="metric-container"] {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        padding: 0.8rem !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: var(--accent-green) !important;
+        font-family: 'Rajdhani', sans-serif !important;
+    }
+    div[data-testid="stMetricLabel"] { color: var(--text-secondary) !important; }
+    div[data-testid="stMetricDelta"] svg { display: inline-block; }
+
+    /* ══ TABS ══ */
+    .stTabs {
+        margin-top: 0.5rem !important;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--bg-secondary) !important;
+        border-radius: 10px !important;
+        padding: 6px !important;
+        gap: 6px !important;
+        border: 1px solid var(--border) !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: var(--text-secondary) !important;
+        font-family: 'Space Grotesk', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        background: transparent !important;
+        border: none !important;
+        transition: all 0.2s ease !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(0,214,143,0.08) !important;
+        color: var(--text-primary) !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: var(--bg-card) !important;
+        color: var(--accent-green) !important;
+        border: 1px solid var(--accent-green) !important;
+        box-shadow: 0 0 12px rgba(0,214,143,0.15) !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background: transparent !important;
+        border: none !important;
+        padding-top: 1rem !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background: var(--accent-green) !important;
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+
+    /* ══ INPUTS & WIDGETS ══ */
+    .stSelectbox > div > div,
+    .stNumberInput > div > div,
+    .stTextInput > div > div,
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div {
+        background: var(--bg-card) !important;
+        border-color: var(--border) !important;
+        color: var(--text-primary) !important;
+    }
+    .stTextInput input, .stNumberInput input, .stSelectbox input { color: var(--text-primary) !important; }
+    div[data-baseweb="select"] span { color: var(--text-primary) !important; }
+    div[data-baseweb="select"] { color: var(--text-primary) !important; }
+    div[data-baseweb="popover"] > div { background: var(--bg-secondary) !important; }
+    ul[data-baseweb="menu"] { background: var(--bg-secondary) !important; }
+    ul[data-baseweb="menu"] li { color: var(--text-primary) !important; }
+    ul[data-baseweb="menu"] li:hover { background: var(--bg-card) !important; }
+
+    /* ══ SLIDERS ══ */
+    .stSlider > div > div > div[data-baseweb="slider"] > div {
+        background: var(--border) !important;
+    }
+    .stSlider div[role="slider"] {
+        background: var(--accent-green) !important;
+        border-color: var(--accent-green) !important;
+    }
+
+    /* ══ BUTTONS ══ */
+    .stButton > button {
+        background: var(--bg-card) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+    }
+    .stButton > button:hover {
+        border-color: var(--accent-green) !important;
+        color: var(--accent-green) !important;
+    }
+    .stButton > button[kind="primary"],
+    .stButton > button[data-testid="stBaseButton-primary"] {
+        background: linear-gradient(135deg, #00d68f, #00b4d8) !important;
+        color: #000 !important;
+        border: none !important;
+        font-weight: 700 !important;
+    }
+
+    /* ══ EXPANDER ══ */
+    .streamlit-expanderHeader {
+        background: var(--bg-card) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+    }
+    details[data-testid="stExpander"] {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+    }
+    details[data-testid="stExpander"] summary {
+        color: var(--text-primary) !important;
+    }
+    details[data-testid="stExpander"] > div {
+        background: var(--bg-card) !important;
+        border: none !important;
+    }
+
+    /* ══ DIVIDERS / HR ══ */
+    hr, .stDivider, div[data-testid="stMarkdownContainer"] hr {
+        border-color: var(--border) !important;
+        background: var(--border) !important;
+        opacity: 0.5;
+    }
+
+    /* ══ DATAFRAMES ══ */
+    .dataframe, .stDataFrame {
+        background: var(--bg-card) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+    }
+    .stDataFrame iframe { border: none !important; }
+    div[data-testid="stDataFrame"] { border: 1px solid var(--border) !important; border-radius: 8px !important; }
+
+    /* ══ TEXT & HEADINGS ══ */
+    p, li, label, .stMarkdown, span { color: var(--text-primary) !important; }
+    h1, h2, h3, h4 {
+        font-family: 'Rajdhani', sans-serif !important;
+        color: var(--text-primary) !important;
+    }
+    .stMarkdown a { color: var(--accent-blue) !important; }
+
+    /* ══ ALERT BOXES ══ */
+    div[data-testid="stAlert"],
+    .stAlert {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+    }
+    div[data-testid="stAlert"] * { color: var(--text-primary) !important; }
+
+    /* ══ LINE CHART ══ */
+    div[data-testid="stVegaLiteChart"] {
+        background: transparent !important;
+        border: none !important;
+    }
+
+    /* ══ CUSTOM CARDS ══ */
+    .pfa-card {
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+        padding: 1.2rem 1.5rem; margin-bottom: 0.8rem; transition: all 0.2s ease;
+    }
+    .pfa-card:hover { border-color: var(--accent-green); box-shadow: 0 0 20px rgba(0,214,143,0.08); transform: translateY(-1px); }
+    .pfa-header {
+        background: linear-gradient(135deg, #0f1e35 0%, #0a1628 100%);
+        border-bottom: 1px solid var(--border) !important; padding: 1.5rem 2rem;
+        border-radius: 12px; margin-bottom: 1.5rem;
+    }
+    .pfa-title {
+        font-family: 'Rajdhani', sans-serif; font-size: 2.2rem; font-weight: 700;
+        background: linear-gradient(90deg, #00d68f, #4facfe);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .match-card {
+        background: var(--bg-card); border: 1px solid var(--border) !important;
+        border-radius: 14px; padding: 1.4rem; margin-bottom: 1rem;
+        position: relative; overflow: hidden;
+    }
+    .match-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: linear-gradient(90deg, var(--accent-green), var(--accent-blue)) !important;
+        border: none !important;
+    }
+    .match-teams { font-family: 'Rajdhani', sans-serif; font-size: 1.35rem; font-weight: 700; color: var(--text-primary); }
+    .prob-bar-container { display: flex; border-radius: 6px; overflow: hidden; height: 10px; margin: 0.4rem 0; }
+    .prob-home { background: var(--accent-green); } .prob-draw { background: var(--accent-gold); } .prob-away { background: var(--accent-red); }
+    .badge-premium { background: linear-gradient(135deg, #f5a623, #f76b1c); color: #000; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+    .badge-value { background: linear-gradient(135deg, #00d68f, #00b4d8); color: #000; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+    .badge-risky { background: rgba(255,77,109,0.2); color: #ff4d6d; border: 1px solid #ff4d6d44 !important; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+    .badge-good { background: rgba(79,172,254,0.15); color: var(--accent-blue); border: 1px solid #4facfe44 !important; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+    .confidence-bar-track { background: var(--border); border-radius: 4px; height: 8px; margin-top: 4px; overflow: hidden; }
+    .confidence-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+    .section-header {
+        font-family: 'Rajdhani', sans-serif; font-size: 1.3rem; font-weight: 700;
+        color: var(--text-primary); padding: 0.5rem 0; border-bottom: 2px solid var(--accent-green) !important; margin-bottom: 1rem;
+    }
+
+    /* ══ SCROLLBAR ══ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-green); }
+
+    /* ══ RESPONSIVE MODE ══ */
+    .vb-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.8rem; margin-bottom: 0.8rem; }
+    .custom-vb-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem; }
     
-    col_sel1, col_sel2 = st.columns(2)
-    n1 = col_sel1.selectbox("🏠 Domicile", equipes, index=0)
-    n2 = col_sel2.selectbox("✈️ Extérieur", equipes, index=min(1, len(equipes) - 1))
-
-    if n1 == n2:
-        st.warning("⚠️ Sélectionne deux équipes différentes.")
-        st.stop()
-
-    e1 = next(e for e in data_ligue if e["team"]["name"] == n1)
-    e2 = next(e for e in data_ligue if e["team"]["name"] == n2)
-    s1 = extraire_stats(e1)
-    s2 = extraire_stats(e2)
-
-    # ── Ajustements terrain ──
-    st.markdown('<div class="section-title">🛠️ Ajustements terrain</div>', unsafe_allow_html=True)
-    aj1, aj2 = st.columns(2)
-    with aj1:
-        but1 = st.toggle(f"Buteur principal {n1} présent", value=True, key="bt1")
-        rep1 = st.slider(f"Jours de repos — {n1}", 1, 14, 7, key="sl1")
-    with aj2:
-        but2 = st.toggle(f"Buteur principal {n2} présent", value=True, key="bt2")
-        rep2 = st.slider(f"Jours de repos — {n2}", 1, 14, 7, key="sl2")
-
-    with st.spinner("Analyse du moteur bivarié en cours..."):
-        # ── Calcul ──
-        l_h, l_a = calculer_lambdas(s1, s2, moy_gf, but1, but2, rep1, rep2)
-        mat = matrice_scores(l_h, l_a)
-        p1, pn, p2, pbtts, p_over15 = probabilites_depuis_matrice(mat)
-        score_h, score_a, score_prob = score_le_plus_probable(mat)
-
-        logo1 = e1["team"].get("crest", "")
-        logo2 = e2["team"].get("crest", "")
-
-        # ── En-tête match ──
-        st.markdown(
-            match_header_html(n1, n2, logo1, logo2, p1, pn, p2, s1["form"], s2["form"]),
-            unsafe_allow_html=True
-        )
-
-        # ── Stats comparées ──
-        st.markdown('<div class="section-title">📋 Statistiques avancées</div>', unsafe_allow_html=True)
-        cs1, cs2 = st.columns(2)
-        with cs1:
-            st.markdown(f"**🏠 {n1}** — Rang #{e1.get('position', '?')}")
-            st.markdown(stat_grid_html(s1, l_h, c["acc"]), unsafe_allow_html=True)
-        with cs2:
-            st.markdown(f"**✈️ {n2}** — Rang #{e2.get('position', '?')}")
-            st.markdown(stat_grid_html(s2, l_a, c["danger"]), unsafe_allow_html=True)
-
-        # ── Graphiques ──
-        st.markdown('<div class="section-title">📊 Synthèse visuelle</div>', unsafe_allow_html=True)
-        gc1, gc2 = st.columns(2)
-        with gc1:
-            st.plotly_chart(fig_radar(s1, s2, n1, n2, c), use_container_width=True)
-        with gc2:
-            st.plotly_chart(fig_barres(s1, s2, n1, n2, c), use_container_width=True)
-
-        st.plotly_chart(fig_heatmap(mat, n1, n2, c), use_container_width=True)
-        st.markdown(
-            f'<div class="text-center w-100" style="opacity:0.6;font-size:14px;">Score le plus probable : <strong>{n1} {score_h}–{score_a} {n2}</strong> ({score_prob*100:.1f}%)</div><br>',
-            unsafe_allow_html=True
-        )
-
-        # ── Jauges de confiance ──
-        st.markdown('<div class="section-title">🎯 Profil Probabiliste</div>', unsafe_allow_html=True)
-        gj1, gj2, gj3 = st.columns(3)
-        with gj1:
-            st.plotly_chart(fig_jauge(p1, f"Victoire {n1}", couleur_prob(p1), c), use_container_width=True)
-        with gj2:
-            st.plotly_chart(fig_jauge(p_over15, "Over 1.5 buts", couleur_prob(p_over15), c), use_container_width=True)
-        with gj3:
-            st.plotly_chart(fig_jauge(pbtts, "Both Teams To Score", couleur_prob(pbtts), c), use_container_width=True)
-
-        # ── Verdict Expert & Value ──
-        st.markdown('<div class="section-title">🏆 Value Bets & Bankroll</div>', unsafe_allow_html=True)
-
-        # Identification du favori 1N2
-        if p1 > p2 and p1 > pn:   res, prob_f, coul_r = n1, p1, c["acc"]
-        elif p2 > p1 and p2 > pn: res, prob_f, coul_r = n2, p2, c["danger"]
-        else:                     res, prob_f, coul_r = "Match Nul", pn, c["warning"]
+    @media (max-width: 768px) {
+        .block-container { padding: 4.5rem 1rem 1rem 1rem !important; }
+        .pfa-title { font-size: 1.6rem !important; }
+        .pfa-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1rem; }
+        .match-teams { font-size: 1.1rem !important; }
+        .match-card > div:first-child { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+        .match-card > div:first-child > div:last-child { text-align: left !important; }
         
-        cote_1n2 = round(1 / prob_f, 2) if prob_f > 0 else 99.0
+        .vb-stats-grid, .custom-vb-grid { 
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.5rem !important;
+        }
+        .stTabs [data-baseweb="tab-list"] { overflow-x: auto; flex-wrap: nowrap; }
+        .stTabs [data-baseweb="tab"] { font-size: 0.85rem !important; padding: 8px 12px !important; white-space: nowrap; }
+        
+        .vb-card-header { flex-direction: column; align-items: flex-start !important; gap: 8px; }
+        .vb-odd-text { align-self: flex-start; font-size: 1.3rem !important; }
+    }
 
-        vd1, vd2, vd3 = st.columns(3)
+    /* ══ TOAST/NOTIFICATIONS ══ */
+    div[data-testid="stNotification"] {
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-        # Carte 1N2
-        with vd1:
-            badge_1n2 = f'<span class="badge-blue">👉 {res}</span>'
-            st.markdown(
-                verdict_card_html("🏆 Prono 1N2", f'<span style="color:{coul_r}">{res}</span>', prob_f, badge_1n2,
-                                  f"Cote algo : {cote_1n2} · Score attendu : {score_h}–{score_a}"),
-                unsafe_allow_html=True
-            )
-            c_bk1 = st.number_input("Cote proposée 1N2", 1.01, 30.0, float(cote_1n2), 0.05, key="k1")
-            kelly_1 = kelly_criterion(prob_f, c_bk1)
-            st.markdown(kelly_html(kelly_1, c_bk1 > cote_1n2 + SEUIL_VALUE), unsafe_allow_html=True)
+# ─────────────────────────────────────────────
+# SESSION STATE
+# ─────────────────────────────────────────────
+if 'bankroll' not in st.session_state:
+    st.session_state.bankroll = APP_CONFIG['initial_bankroll']
+if 'tracker' not in st.session_state:
+    st.session_state.tracker = BankrollTracker(st.session_state.bankroll)
+if 'predictions_cache' not in st.session_state:
+    st.session_state.predictions_cache = {}
 
-        # Carte Over 1.5
-        with vd2:
-            cote_o = round(1 / p_over15, 2) if p_over15 > 0 else 9.99
-            cote_u = round(1 / (1 - p_over15), 2) if p_over15 < 1 else 9.99
-            label_o = "OVER 1.5" if p_over15 > SEUIL_OVER15 else "UNDER 1.5"
-            badge_o = '<span class="badge-green">📈 OVER 1.5</span>' if p_over15 > SEUIL_OVER15 else '<span class="badge-red">📉 UNDER 1.5</span>'
-            st.markdown(
-                verdict_card_html("⚽ Marché des Buts", label_o, p_over15 if p_over15 > SEUIL_OVER15 else (1-p_over15), badge_o,
-                                  f"Cote algo Over : {cote_o} · Under : {cote_u}"),
-                unsafe_allow_html=True
-            )
-            c_bk_o = st.number_input("Cote proposée Over 1.5", 1.01, 10.0, float(cote_o) if p_over15 > SEUIL_OVER15 else 1.25, 0.05, key="k2")
-            kelly_o = kelly_criterion(p_over15 if p_over15 > SEUIL_OVER15 else (1-p_over15), c_bk_o)
-            st.markdown(kelly_html(kelly_o, c_bk_o > (cote_o if p_over15 > SEUIL_OVER15 else cote_u) + SEUIL_VALUE), unsafe_allow_html=True)
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+@st.cache_resource
+def get_engine():
+    elo = EloSystem()
+    for m in DEMO_MATCHES:
+        elo.ratings[m['home']] = m['home_elo']
+        elo.ratings[m['away']] = m['away_elo']
+    return FootballEngineV3(elo_system=elo)
 
-        # Carte BTTS
-        with vd3:
-            cote_b = round(1 / pbtts, 2) if pbtts > 0 else 9.99
-            cote_nb = round(1 / (1 - pbtts), 2) if pbtts < 1 else 9.99
-            label_b = "OUI" if pbtts > SEUIL_BTTS else "NON"
-            badge_b = '<span class="badge-green">✅ BTTS OUI</span>' if pbtts > SEUIL_BTTS else '<span class="badge-red">❌ BTTS NON</span>'
-            st.markdown(
-                verdict_card_html("🎯 BTTS (Les 2 marquent)", label_b, pbtts if pbtts > SEUIL_BTTS else (1-pbtts), badge_b,
-                                  f"Cote algo BTTS : {cote_b} - Non: {cote_nb}"),
-                unsafe_allow_html=True
-            )
-            c_bk_b = st.number_input("Cote proposée BTTS", 1.01, 10.0, float(cote_b) if pbtts > SEUIL_BTTS else 1.85, 0.05, key="k3")
-            kelly_b = kelly_criterion(pbtts if pbtts > SEUIL_BTTS else (1-pbtts), c_bk_b)
-            st.markdown(kelly_html(kelly_b, c_bk_b > (cote_b if pbtts > SEUIL_BTTS else cote_nb) + SEUIL_VALUE), unsafe_allow_html=True)
+@st.cache_resource
+def get_detector():
+    return ValueBetDetector()
 
-
-def tab_classement(data_ligue: list):
-    """Affiche le DataFrame du championnat sélectionné."""
-    st.markdown('<div class="section-title">📊 Classement Actuel</div>', unsafe_allow_html=True)
-    df = pd.DataFrame([{
-        "Rang":   e.get("position", "?"),
-        "Équipe": e["team"]["name"],
-        "MJ":     e.get("playedGames", 0),
-        "V":      e.get("won", 0),
-        "N":      e.get("draw", 0),
-        "D":      e.get("lost", 0),
-        "Pts":    e.get("points", 0),
-        "Buts +": e.get("goalsFor", 0),
-        "Buts -": e.get("goalsAgainst", 0),
-        "Diff":   e.get("goalsFor", 0) - e.get("goalsAgainst", 0),
-        "Forme":  str(e.get("form", "") or "").replace(",", "")[-5:],
-    } for e in data_ligue])
-    
-    st.dataframe(
-        df, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={"Diff": st.column_config.NumberColumn(format="%+d")}
+def run_prediction(match, engine):
+    key = match['id']
+    if key in st.session_state.predictions_cache:
+        return st.session_state.predictions_cache[key]
+    result = engine.predict_match(
+        home_attack_base=match['home_attack'], home_defense_base=match['home_defense'],
+        away_attack_base=match['away_attack'], away_defense_base=match['away_defense'],
+        home_xg=match.get('home_xg'), away_xg=match.get('away_xg'),
+        home_team=match['home'], away_team=match['away'],
+        home_form_results=match.get('home_form'), away_form_results=match.get('away_form'),
+        home_rest_days=match.get('home_rest', 7), away_rest_days=match.get('away_rest', 7),
+        home_key_players_absent=match.get('home_absent', 0), away_key_players_absent=match.get('away_absent', 0),
     )
+    st.session_state.predictions_cache[key] = result
+    return result
 
+def confidence_color(score):
+    if score >= 75: return "#00d68f"
+    elif score >= 60: return "#f5a623"
+    return "#ff4d6d"
 
-# ─── Logique principale ─────────────────────────
-def main():
-    choix_ligue, theme_clair = render_sidebar()
-    c = get_couleurs(theme_clair)
-    injecter_css(c)
+def render_prob_bar(home, draw, away):
+    hp, dp, ap = int(home*100), int(draw*100), int(away*100)
+    return f"""
+    <div class="prob-bar-container">
+        <div class="prob-home" style="width:{hp}%"></div>
+        <div class="prob-draw" style="width:{dp}%"></div>
+        <div class="prob-away" style="width:{ap}%"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#8892a4; margin-top:4px;">
+        <span style="color:#00d68f">1 {hp}%</span>
+        <span style="color:#f5a623">X {dp}%</span>
+        <span style="color:#ff4d6d">2 {ap}%</span>
+    </div>
+    """
 
-    # Récupération au niveau de l'orchestrateur (Streamlit cache en natif)
-    data_ligue = charger_classement(CHAMPIONNATS[choix_ligue])
+def render_confidence_bar(score):
+    color = confidence_color(score)
+    return f"""
+    <div style="display:flex; align-items:center; gap:8px;">
+        <div class="confidence-bar-track" style="flex:1;">
+            <div class="confidence-bar-fill" style="width:{score}%; background:{color};"></div>
+        </div>
+        <span style="color:{color}; font-weight:700; font-size:0.9rem; min-width:36px;">{score:.0f}</span>
+    </div>
+    """
 
-    if not data_ligue:
-        st.stop()  # L'erreur est gérée via le module core.api de manière propre
-
-    moy_gf = moyenne_buts_ligue(data_ligue)
-
-    # UI structure
-    t1, t2 = st.tabs(["🎯 ANALYSE DU MATCH", "📊 TABLEAU DU CHAMPIONNAT"])
-
-    with t1:
-        tab_analyse(data_ligue, moy_gf, c)
-
-    with t2:
-        tab_classement(data_ligue)
-
-    # ─── Footer ───
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style="text-align:center; padding:1rem 0;">
+        <div style="font-family:'Rajdhani',sans-serif; font-size:1.8rem; font-weight:700;
+             background:linear-gradient(90deg,#00d68f,#4facfe);
+             -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+            ⚽ PRO-FOOT AI
+        </div>
+        <div style="color:#8892a4; font-size:0.75rem; margin-top:4px;">V3.0 · Moteur Dixon-Coles+</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.divider()
-    st.caption("🚀 PRO-FOOT AI V12.1 · Poisson Bivarié Normalisé · Kelly Criterion · Design Premium")
+    st.markdown("**💰 Bankroll**")
+    bankroll = st.number_input("Montant (€)", min_value=10.0, max_value=100000.0,
+                                value=st.session_state.bankroll, step=50.0)
+    if bankroll != st.session_state.bankroll:
+        st.session_state.bankroll = bankroll
+    st.divider()
+    st.markdown("**🔧 Filtres**")
+    leagues = ['Toutes'] + list(set(m['league'] for m in DEMO_MATCHES))
+    selected_league = st.selectbox("Ligue", leagues)
+    min_conf = st.slider("Confiance min", 0, 100, 50, 5)
+    min_edge_pct = st.slider("Edge min (%)", 0, 20, 3, 1)
+    st.divider()
+    st.markdown("**⚙️ Stratégie Kelly**")
+    kelly_frac = st.select_slider("Fraction Kelly", options=[0.1, 0.15, 0.25, 0.33, 0.5],
+                                   value=0.25, format_func=lambda x: f"1/{int(1/x)}")
+    max_bet = st.slider("Mise max (%)", 1, 10, 5, 1)
+    st.divider()
+    st.markdown("""
+    <div style="color:#8892a4; font-size:0.7rem; text-align:center;">
+        🔬 Modèle: Dixon-Coles + xG + ELO<br>
+        ⚠️ À des fins éducatives uniquement
+    </div>
+    """, unsafe_allow_html=True)
 
+# ─────────────────────────────────────────────
+# INIT ENGINE & COMPUTE
+# ─────────────────────────────────────────────
+engine = get_engine()
+detector = get_detector()
+detector.kelly.kelly_fraction = kelly_frac
+detector.kelly.max_bet_pct = max_bet / 100
 
-if __name__ == "__main__":
-    main()
+filtered_matches = DEMO_MATCHES
+if selected_league != 'Toutes':
+    filtered_matches = [m for m in DEMO_MATCHES if m['league'] == selected_league]
+
+all_predictions = {}
+all_value_bets = []
+
+for match in filtered_matches:
+    pred = run_prediction(match, engine)
+    all_predictions[match['id']] = pred
+    probs = pred['probabilities']
+    odds_mapped = {
+        'home_win': match['odds'].get('home_win'), 'draw': match['odds'].get('draw'),
+        'away_win': match['odds'].get('away_win'), 'over_2.5': match['odds'].get('over_2.5'),
+        'under_2.5': match['odds'].get('under_2.5'), 'btts_yes': match['odds'].get('btts_yes'),
+        'btts_no': match['odds'].get('btts_no'),
+    }
+    probs_mapped = {
+        'home_win': probs['home_win'], 'draw': probs['draw'], 'away_win': probs['away_win'],
+        'over_2.5': probs['over_2.5'], 'under_2.5': probs['under_2.5'],
+        'btts_yes': probs['btts_yes'], 'btts_no': probs['btts_no'],
+    }
+    odds_filtered = {k: v for k, v in odds_mapped.items() if v is not None}
+    vbs = detector.analyze_match(
+        f"{match['home']} vs {match['away']}", probs_mapped, odds_filtered,
+        pred['components'], data_completeness=0.85
+    )
+    vbs = [v for v in vbs if v.confidence_score >= min_conf and v.edge_pct >= min_edge_pct]
+    for vb in vbs:
+        vb._match_id = match['id']
+    all_value_bets.extend(vbs)
+
+# ─────────────────────────────────────────────
+# TABS
+# ─────────────────────────────────────────────
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "🏠 Dashboard", "📊 Analyse Match", "💰 Value Bets", "📈 Bankroll", "🔬 Backtesting", "⚽ Mon Match"
+])
+
+# ═══════════════════════════════════════════════
+# TAB 1: DASHBOARD
+# ═══════════════════════════════════════════════
+with tab1:
+    st.markdown("""
+    <div class="pfa-header">
+        <div class="pfa-title">⚽ PRO-FOOT AI V3</div>
+        <div style="color:#8892a4; font-size:0.85rem;">
+            Moteur Dixon-Coles + xG + ELO Dynamique | Détection de value bets professionnelle
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    n_premium = sum(1 for v in all_value_bets if '💎' in v.label)
+    n_value = sum(1 for v in all_value_bets if '🔥' in v.label)
+    avg_conf = np.mean([v.confidence_score for v in all_value_bets]) if all_value_bets else 0
+    avg_ev = np.mean([v.expected_value for v in all_value_bets]) if all_value_bets else 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Matchs analysés", len(filtered_matches))
+    with c2: st.metric("Value Bets", len(all_value_bets), delta=f"{n_premium} premium" if n_premium > 0 else None)
+    with c3: st.metric("Confiance moy.", f"{avg_conf:.0f}/100")
+    with c4: st.metric("EV moyen", f"{avg_ev:+.3f}")
+
+    st.markdown("---")
+    st.markdown('<div class="section-header">📅 Matchs du Jour</div>', unsafe_allow_html=True)
+
+    for match in filtered_matches:
+        pred = all_predictions[match['id']]
+        probs = pred['probabilities']
+        match_vbs = [v for v in all_value_bets if hasattr(v, '_match_id') and v._match_id == match['id']]
+        st.markdown(f"""
+        <div class="match-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="match-teams">{match['home']} <span style="color:#8892a4; font-size:1rem;">vs</span> {match['away']}</div>
+                    <div style="font-size:0.78rem; color:#8892a4;">🏆 {match['league']} &nbsp;|&nbsp; 🕐 {match['date']}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:0.75rem; color:#8892a4;">Score probable</div>
+                    <div style="font-family:'Rajdhani',sans-serif; font-size:1.4rem; font-weight:700; color:#4facfe;">
+                        {probs['most_likely_score'][0]} - {probs['most_likely_score'][1]}
+                    </div>
+                    <div style="font-size:0.7rem; color:#8892a4;">{probs['most_likely_prob']*100:.1f}%</div>
+                </div>
+            </div>
+            {render_prob_bar(probs['home_win'], probs['draw'], probs['away_win'])}
+        """, unsafe_allow_html=True)
+        if match_vbs:
+            vb_html = " ".join([f'<span class="badge-{"premium" if "💎" in v.label else "value" if "🔥" in v.label else "good"}">{v.label} {v.bet_type.value} @{v.bookmaker_odd:.2f}</span>' for v in match_vbs[:3]])
+            st.markdown(f'<div style="margin-top:0.5rem;">{vb_html}</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════
+# TAB 2: ANALYSE DÉTAILLÉE
+# ═══════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="section-header">🔬 Analyse Détaillée par Match</div>', unsafe_allow_html=True)
+    match_options = {f"{m['home']} vs {m['away']} ({m['league']})": m for m in filtered_matches}
+    selected_match_name = st.selectbox("Sélectionner un match", list(match_options.keys()))
+    sel_match = match_options[selected_match_name]
+    sel_pred = all_predictions[sel_match['id']]
+    sel_probs = sel_pred['probabilities']
+    sel_comp = sel_pred['components']
+
+    col_a, col_b = st.columns([2, 1])
+    with col_a:
+        st.markdown("#### 📊 Probabilités 1N2")
+        ca, cb, cc = st.columns(3)
+        with ca: st.metric("🏠 Domicile", f"{sel_probs['home_win']*100:.1f}%")
+        with cb: st.metric("🤝 Nul", f"{sel_probs['draw']*100:.1f}%")
+        with cc: st.metric("✈️ Extérieur", f"{sel_probs['away_win']*100:.1f}%")
+
+        st.markdown("#### ⚽ Over/Under & BTTS")
+        c4, c5, c6, c7 = st.columns(4)
+        with c4: st.metric("O1.5", f"{sel_probs['over_1.5']*100:.0f}%")
+        with c5: st.metric("O2.5", f"{sel_probs['over_2.5']*100:.0f}%")
+        with c6: st.metric("BTTS ✅", f"{sel_probs['btts_yes']*100:.0f}%")
+        with c7: st.metric("BTTS ❌", f"{sel_probs['btts_no']*100:.0f}%")
+
+        st.markdown("#### 🎯 Top Scores Probables")
+        score_df = pd.DataFrame(
+            [(f"{i}-{j}", f"{p*100:.2f}%") for i, j, p in sel_probs['top_scores']],
+            columns=['Score', 'Probabilité']
+        )
+        st.dataframe(score_df, use_container_width=True, hide_index=True)
+
+    with col_b:
+        st.markdown("#### 🔧 Features du Modèle")
+        features = {
+            "xG Domicile": sel_pred['lambda'], "xG Extérieur": sel_pred['mu'],
+            "ELO Dom.": sel_comp.get('elo_home', 'N/A'), "ELO Ext.": sel_comp.get('elo_away', 'N/A'),
+            "Forme Att. Dom.": f"{sel_comp.get('form_home_attack', 1.0):.2f}",
+            "Forme Att. Ext.": f"{sel_comp.get('form_away_attack', 1.0):.2f}",
+            "Fatigue Dom.": f"{sel_comp.get('fatigue_home', 1.0):.2f}",
+            "Fatigue Ext.": f"{sel_comp.get('fatigue_away', 1.0):.2f}",
+        }
+        for label, val in features.items():
+            if val != 'N/A':
+                val_f = float(val) if isinstance(val, str) else float(val)
+                color = "#00d68f" if val_f >= 1.0 else "#ff4d6d"
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #2a3a52;">
+                    <span style="color:#8892a4; font-size:0.85rem;">{label}</span>
+                    <span style="color:{color}; font-weight:600;">{val_f:.2f}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #2a3a52;">
+                    <span style="color:#8892a4; font-size:0.85rem;">{label}</span>
+                    <span style="color:#8892a4;">N/A</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════
+# TAB 3: VALUE BETS
+# ═══════════════════════════════════════════════
+with tab3:
+    st.markdown('<div class="section-header">💎 Value Bets Détectés</div>', unsafe_allow_html=True)
+
+    if not all_value_bets:
+        st.info("Aucun value bet détecté avec les filtres actuels.")
+    else:
+        sort_by = st.selectbox("Trier par", ["Confiance ↓", "Edge % ↓", "Expected Value ↓", "Cote ↓"])
+        sorted_bets = list(all_value_bets)
+        if "Confiance" in sort_by: sorted_bets.sort(key=lambda x: x.confidence_score, reverse=True)
+        elif "Edge" in sort_by: sorted_bets.sort(key=lambda x: x.edge, reverse=True)
+        elif "Expected Value" in sort_by: sorted_bets.sort(key=lambda x: x.expected_value, reverse=True)
+        else: sorted_bets.sort(key=lambda x: x.bookmaker_odd, reverse=True)
+
+        for vb in sorted_bets:
+            conf_color = confidence_color(vb.confidence_score)
+            badge_class = ("badge-premium" if "💎" in vb.label else "badge-value" if "🔥" in vb.label
+                          else "badge-risky" if "⚠️" in vb.label else "badge-good")
+            stake_amount = st.session_state.bankroll * vb.kelly_fraction
+            ev_color = '#00d68f' if vb.expected_value > 0 else '#ff4d6d'
+            # Split into smaller HTML chunks to prevent Streamlit rendering issues
+            card_html = (
+                f'<div class="pfa-card">'
+                f'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.8rem;">'
+                f'<div>'
+                f'<div style="font-family:Rajdhani,sans-serif;font-size:1.1rem;font-weight:700;color:#e8ecf0;margin-bottom:4px;">{vb.match}</div>'
+                f'<span class="{badge_class}">{vb.label}</span>'
+                f'<span style="color:#8892a4;font-size:0.85rem;margin-left:8px;">{vb.bet_type.value}</span>'
+                f'</div>'
+                f'<div style="text-align:right;">'
+                f'<div style="font-family:Rajdhani,sans-serif;font-size:1.8rem;font-weight:700;color:#4facfe;">@{vb.bookmaker_odd:.2f}</div>'
+                f'</div></div>'
+                f'<div class="vb-stats-grid">'
+                f'<div style="background:#111827;border-radius:8px;padding:0.6rem;text-align:center;">'
+                f'<div style="color:#00d68f;font-weight:700;">{vb.model_prob*100:.1f}%</div>'
+                f'<div style="color:#8892a4;font-size:0.7rem;">Prob. modèle</div></div>'
+                f'<div style="background:#111827;border-radius:8px;padding:0.6rem;text-align:center;">'
+                f'<div style="color:#f5a623;font-weight:700;">{vb.implied_prob*100:.1f}%</div>'
+                f'<div style="color:#8892a4;font-size:0.7rem;">Prob. implicite</div></div>'
+                f'<div style="background:#111827;border-radius:8px;padding:0.6rem;text-align:center;">'
+                f'<div style="color:#00d68f;font-weight:700;">+{vb.edge_pct:.1f}%</div>'
+                f'<div style="color:#8892a4;font-size:0.7rem;">Edge</div></div>'
+                f'<div style="background:#111827;border-radius:8px;padding:0.6rem;text-align:center;">'
+                f'<div style="color:#4facfe;font-weight:700;">{vb.kelly_fraction*100:.1f}%</div>'
+                f'<div style="color:#8892a4;font-size:0.7rem;">Kelly mise</div></div>'
+                f'</div>'
+                f'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+                f'<span style="color:#8892a4;font-size:0.8rem;">Confiance</span>'
+                f'<span style="color:{conf_color};font-weight:700;">{vb.confidence_score:.0f}/100</span></div>'
+                f'{render_confidence_bar(vb.confidence_score)}'
+                f'<div style="background:rgba(0,214,143,0.06);border-radius:8px;padding:0.6rem;margin-top:0.5rem;">'
+                f'<div style="color:#c8d0dc;font-size:0.8rem;">📌 {vb.explanation}</div></div>'
+                f'<div style="margin-top:0.6rem;display:flex;justify-content:space-between;">'
+                f'<span style="color:#8892a4;font-size:0.78rem;">Mise: <span style="color:#00d68f;font-weight:700;">€{stake_amount:.2f}</span></span>'
+                f'<span style="color:#8892a4;font-size:0.78rem;">EV: <span style="color:{ev_color};font-weight:600;">{vb.expected_value:+.3f}</span></span>'
+                f'</div></div>'
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════
+# TAB 4: BANKROLL
+# ═══════════════════════════════════════════════
+with tab4:
+    st.markdown('<div class="section-header">💰 Suivi Bankroll</div>', unsafe_allow_html=True)
+    tracker = st.session_state.tracker
+    stats = tracker.get_stats()
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Bankroll", f"€{stats['current_bankroll']:.2f}", delta=f"{stats['bankroll_growth']:+.1f}%")
+    with c2: st.metric("ROI", f"{stats['roi']:+.1f}%")
+    with c3: st.metric("Win Rate", f"{stats['win_rate']:.0f}%", delta=f"{stats['n_wins']}W / {stats['n_losses']}L")
+    with c4: st.metric("Max DD", f"-{stats['max_drawdown']:.1f}%")
+    st.markdown("---")
+    with st.expander("➕ Enregistrer un pari"):
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            bet_match = st.text_input("Match")
+            bet_type_str = st.selectbox("Type", ["1", "X", "2", "O2.5", "U2.5", "BTTS+"])
+            bet_odd = st.number_input("Cote", min_value=1.01, value=2.00, step=0.05)
+        with ec2:
+            bet_stake = st.number_input("Mise (€)", min_value=1.0, value=20.0, step=5.0)
+            bet_prob = st.slider("Prob. modèle (%)", 0, 100, 55) / 100
+            bet_conf = st.slider("Score confiance", 0, 100, 70)
+        if st.button("💾 Enregistrer", type="primary"):
+            if bet_match:
+                tracker.add_bet(bet_match, bet_type_str, bet_odd, bet_stake, bet_prob, bet_conf)
+                st.success(f"Pari enregistré: {bet_match} — {bet_type_str} @{bet_odd}")
+                st.rerun()
+    pending = [b for b in tracker.bets if b.status == 'pending']
+    if pending:
+        st.markdown("#### ⏳ Paris en attente")
+        for bet in pending:
+            pc1, pc2, pc3, pc4 = st.columns([3, 1, 1, 1])
+            with pc1: st.write(f"**{bet.match}** — {bet.bet_type} @{bet.odd:.2f}")
+            with pc2: st.write(f"€{bet.stake:.2f}")
+            with pc3:
+                if st.button("✅ Gagné", key=f"win_{bet.id}"):
+                    tracker.resolve_bet(bet.id, True); st.rerun()
+            with pc4:
+                if st.button("❌ Perdu", key=f"loss_{bet.id}"):
+                    tracker.resolve_bet(bet.id, False); st.rerun()
+
+# ═══════════════════════════════════════════════
+# TAB 5: BACKTESTING
+# ═══════════════════════════════════════════════
+with tab5:
+    st.markdown('<div class="section-header">🔬 Backtesting & Simulation</div>', unsafe_allow_html=True)
+    bc1, bc2 = st.columns([1, 2])
+    with bc1:
+        st.markdown("#### ⚙️ Paramètres")
+        bt_strategy = st.selectbox("Stratégie", ['kelly_quarter', 'fixed_1pct', 'fixed_2pct'],
+            format_func=lambda x: {'kelly_quarter': 'Kelly 1/4', 'fixed_1pct': 'Fixe 1%', 'fixed_2pct': 'Fixe 2%'}[x])
+        bt_min_conf = st.slider("Confiance min (BT)", 0, 100, 60, 5)
+        bt_min_edge = st.slider("Edge min (BT, %)", 0, 15, 3, 1) / 100
+        bt_bankroll = st.number_input("Bankroll init.", 100, 100000, 1000, 100)
+        if st.button("🚀 Lancer", type="primary"):
+            bt_engine = BacktestEngine(initial_bankroll=float(bt_bankroll))
+            st.session_state.bt_result = bt_engine.run(
+                DEMO_HISTORICAL, strategy=bt_strategy, min_confidence=float(bt_min_conf), min_edge=bt_min_edge)
+    with bc2:
+        if 'bt_result' in st.session_state:
+            r = st.session_state.bt_result
+            if 'error' in r:
+                st.error(r['error'])
+            else:
+                st.markdown(f"#### 📊 Résultats — {r['strategy']}")
+                rc1, rc2, rc3 = st.columns(3)
+                with rc1: st.metric("ROI", f"{r['roi']:+.1f}%", delta="profitable" if r['roi'] > 0 else "perte")
+                with rc2: st.metric("Win Rate", f"{r['win_rate']:.0f}%")
+                with rc3: st.metric("Bankroll finale", f"€{r['final_bankroll']:.0f}", delta=f"{r['bankroll_growth_pct']:+.1f}%")
+                rc4, rc5, rc6 = st.columns(3)
+                with rc4: st.metric("Max DD", f"-{r['max_drawdown_pct']:.1f}%")
+                with rc5: st.metric("Sharpe", f"{r['sharpe']:.2f}")
+                with rc6: st.metric("Paris", r['n_bets'])
+                if r['bankroll_history']:
+                    bk_df = pd.DataFrame({'Paris': range(len(r['bankroll_history'])), 'Bankroll (€)': r['bankroll_history']})
+                    st.line_chart(bk_df.set_index('Paris'), color='#00d68f')
+                    bt_all = BacktestEngine(initial_bankroll=float(bt_bankroll))
+                    comp = bt_all.compare_strategies(DEMO_HISTORICAL)
+                    if comp:
+                        st.markdown("#### 📋 Comparaison stratégies")
+                        comp_df = pd.DataFrame([{
+                            'Stratégie': x['strategy'], 'ROI': f"{x['roi']:+.1f}%",
+                            'Win Rate': f"{x['win_rate']:.0f}%", 'Bankroll': f"€{x['final_bankroll']:.0f}",
+                            'Sharpe': f"{x['sharpe']:.2f}",
+                        } for x in comp])
+                        st.dataframe(comp_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("👈 Configurez et lancez un backtest")
+
+# ═══════════════════════════════════════════════
+# TAB 6: MON MATCH (CUSTOM ANALYSIS)
+# ═══════════════════════════════════════════════
+with tab6:
+    st.markdown('<div class="section-header">⚽ Analyse Personnalisée</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#8892a4; font-size:0.85rem; margin-bottom:1rem;">Entrez les paramètres de votre match pour obtenir une analyse complète avec détection de value bets.</div>', unsafe_allow_html=True)
+
+    # ── Team Names ──
+    col_t1, col_vs, col_t2 = st.columns([5, 1, 5])
+    
+    available_teams = sorted(list(set(
+        [m['home'] for m in filtered_matches] + [m['away'] for m in filtered_matches]
+    )))
+    if not available_teams:
+        available_teams = ["PSG", "Marseille"]
+        
+    with col_t1:
+        custom_home = st.selectbox("🏠 Équipe Domicile", options=available_teams, index=0, key="custom_home")
+    with col_vs:
+        st.markdown('<div style="text-align:center; padding-top:1.8rem; font-size:1.5rem; font-weight:700; color:#8892a4;">VS</div>', unsafe_allow_html=True)
+    with col_t2:
+        custom_away = st.selectbox("✈️ Équipe Extérieur", options=available_teams, index=1 if len(available_teams) > 1 else 0, key="custom_away")
+
+    st.markdown("---")
+
+    # ── Parameters Grid ──
+    st.markdown("#### ⚙️ Paramètres du Modèle")
+
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        st.markdown(f'<div style="color:#00d68f; font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">🏠 {custom_home}</div>', unsafe_allow_html=True)
+        c_home_attack = st.slider("Force offensive", 0.5, 3.0, 1.45, 0.05, key="c_h_att",
+                                  help="1.0 = moyenne, >1.5 = forte attaque")
+        c_home_defense = st.slider("Force défensive", 0.5, 2.0, 1.10, 0.05, key="c_h_def",
+                                   help="1.0 = moyenne, <0.8 = bonne défense")
+        c_home_elo = st.number_input("ELO", 1200, 2100, 1750, 10, key="c_h_elo")
+        c_home_xg = st.number_input("xG moyen (attendu)", 0.5, 4.0, 1.80, 0.1, key="c_h_xg")
+        c_home_form_str = st.text_input("Forme (W/D/L, 5 derniers)", value="W,W,D,W,L", key="c_h_form",
+                                        help="W=victoire, D=nul, L=défaite")
+        c_home_rest = st.slider("Jours de repos", 1, 14, 5, 1, key="c_h_rest")
+        c_home_absent = st.slider("Joueurs clés absents", 0, 5, 0, 1, key="c_h_absent")
+
+    with pc2:
+        st.markdown(f'<div style="color:#ff4d6d; font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">✈️ {custom_away}</div>', unsafe_allow_html=True)
+        c_away_attack = st.slider("Force offensive", 0.5, 3.0, 1.20, 0.05, key="c_a_att")
+        c_away_defense = st.slider("Force défensive", 0.5, 2.0, 1.05, 0.05, key="c_a_def")
+        c_away_elo = st.number_input("ELO", 1200, 2100, 1640, 10, key="c_a_elo")
+        c_away_xg = st.number_input("xG moyen (attendu)", 0.5, 4.0, 1.20, 0.1, key="c_a_xg")
+        c_away_form_str = st.text_input("Forme (W/D/L, 5 derniers)", value="D,L,W,D,W", key="c_a_form")
+        c_away_rest = st.slider("Jours de repos", 1, 14, 4, 1, key="c_a_rest")
+        c_away_absent = st.slider("Joueurs clés absents", 0, 5, 1, 1, key="c_a_absent")
+
+    st.markdown("---")
+
+    # ── Bookmaker Odds ──
+    st.markdown("#### 💰 Cotes Bookmaker (optionnel)")
+    oc1, oc2, oc3, oc4, oc5 = st.columns(5)
+    with oc1: c_odd_home = st.number_input("Cote 1", 1.01, 20.0, 1.72, 0.05, key="c_odd_h")
+    with oc2: c_odd_draw = st.number_input("Cote X", 1.01, 20.0, 3.80, 0.05, key="c_odd_d")
+    with oc3: c_odd_away = st.number_input("Cote 2", 1.01, 20.0, 4.50, 0.05, key="c_odd_a")
+    with oc4: c_odd_o25 = st.number_input("O2.5", 1.01, 10.0, 1.85, 0.05, key="c_odd_o")
+    with oc5: c_odd_btts = st.number_input("BTTS+", 1.01, 10.0, 1.75, 0.05, key="c_odd_b")
+
+    st.markdown("")
+
+    # ── Launch Analysis ──
+    if st.button("🚀 Lancer l'analyse", type="primary", key="custom_analyze", use_container_width=True):
+        # Parse form results
+        def parse_form(form_str):
+            # Map W/D/L to mock (scored, conceded) tuples
+            mapping = {'W': (2, 0), 'D': (1, 1), 'L': (0, 2), 'w': (2, 0), 'd': (1, 1), 'l': (0, 2)}
+            return [mapping.get(x.strip(), (1, 1)) for x in form_str.split(',') if x.strip() in mapping]
+
+        home_form = parse_form(c_home_form_str)
+        away_form = parse_form(c_away_form_str)
+
+        # Set ELO
+        custom_elo = EloSystem()
+        custom_elo.ratings[custom_home] = c_home_elo
+        custom_elo.ratings[custom_away] = c_away_elo
+        custom_engine = FootballEngineV3(elo_system=custom_elo)
+
+        # Run prediction
+        custom_pred = custom_engine.predict_match(
+            home_attack_base=c_home_attack, home_defense_base=c_home_defense,
+            away_attack_base=c_away_attack, away_defense_base=c_away_defense,
+            home_xg=c_home_xg, away_xg=c_away_xg,
+            home_team=custom_home, away_team=custom_away,
+            home_form_results=home_form, away_form_results=away_form,
+            home_rest_days=c_home_rest, away_rest_days=c_away_rest,
+            home_key_players_absent=c_home_absent, away_key_players_absent=c_away_absent,
+        )
+        cp = custom_pred['probabilities']
+        cc = custom_pred['components']
+
+        st.markdown("---")
+
+        # ── Results Header ──
+        st.markdown(f'''
+        <div class="match-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="match-teams">{custom_home} <span style="color:#8892a4;font-size:1rem;">vs</span> {custom_away}</div>
+                <div style="text-align:right;">
+                    <div style="font-size:0.75rem;color:#8892a4;">Score probable</div>
+                    <div style="font-family:Rajdhani,sans-serif;font-size:1.6rem;font-weight:700;color:#4facfe;">
+                        {cp["most_likely_score"][0]} - {cp["most_likely_score"][1]}
+                    </div>
+                    <div style="font-size:0.7rem;color:#8892a4;">{cp["most_likely_prob"]*100:.1f}%</div>
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
+        st.markdown(render_prob_bar(cp['home_win'], cp['draw'], cp['away_win']), unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── Probabilities ──
+        st.markdown("#### 📊 Résultats de l'analyse")
+        r1, r2, r3 = st.columns(3)
+        with r1: st.metric("🏠 Domicile", f"{cp['home_win']*100:.1f}%")
+        with r2: st.metric("🤝 Nul", f"{cp['draw']*100:.1f}%")
+        with r3: st.metric("✈️ Extérieur", f"{cp['away_win']*100:.1f}%")
+
+        r4, r5, r6, r7 = st.columns(4)
+        with r4: st.metric("O1.5", f"{cp['over_1.5']*100:.0f}%")
+        with r5: st.metric("O2.5", f"{cp['over_2.5']*100:.0f}%")
+        with r6: st.metric("BTTS ✅", f"{cp['btts_yes']*100:.0f}%")
+        with r7: st.metric("BTTS ❌", f"{cp['btts_no']*100:.0f}%")
+
+        # ── Top Scores ──
+        st.markdown("#### 🎯 Top Scores Probables")
+        score_df = pd.DataFrame(
+            [(f"{i}-{j}", f"{p*100:.2f}%") for i, j, p in cp['top_scores']],
+            columns=['Score', 'Probabilité']
+        )
+        st.dataframe(score_df, use_container_width=True, hide_index=True)
+
+        # ── Model Features ──
+        st.markdown("#### 🔧 Features du Modèle")
+        feat_data = {
+            '🎯 xG Domicile': f"{custom_pred['lambda']:.3f}",
+            '🎯 xG Extérieur': f"{custom_pred['mu']:.3f}",
+            '🏆 ELO Domicile': str(c_home_elo),
+            '🏆 ELO Extérieur': str(c_away_elo),
+            '📈 Forme Off. Dom.': f"{cc.get('form_home_attack', 1.0):.2f}",
+            '📈 Forme Off. Ext.': f"{cc.get('form_away_attack', 1.0):.2f}",
+            '💤 Fatigue Dom.': f"{cc.get('fatigue_home', 1.0):.2f}",
+            '💤 Fatigue Ext.': f"{cc.get('fatigue_away', 1.0):.2f}",
+        }
+        feat_html = ''.join([
+            f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a3a52;">'
+            f'<span style="color:#8892a4;font-size:0.85rem;">{k}</span>'
+            f'<span style="color:{"#00d68f" if float(v) >= 1.0 else "#ff4d6d"};font-weight:600;">{v}</span></div>'
+            for k, v in feat_data.items() if v != 'N/A'
+        ])
+        st.markdown(f'<div class="pfa-card">{feat_html}</div>', unsafe_allow_html=True)
+
+        # ── Value Bets Detection ──
+        custom_odds = {
+            'home_win': c_odd_home, 'draw': c_odd_draw, 'away_win': c_odd_away,
+            'over_2.5': c_odd_o25, 'btts_yes': c_odd_btts,
+            'under_2.5': round(1 / (1 - 1/c_odd_o25), 2) if c_odd_o25 > 1 else 5.0,
+            'btts_no': round(1 / (1 - 1/c_odd_btts), 2) if c_odd_btts > 1 else 5.0,
+        }
+        custom_probs = {
+            'home_win': cp['home_win'], 'draw': cp['draw'], 'away_win': cp['away_win'],
+            'over_2.5': cp['over_2.5'], 'under_2.5': cp['under_2.5'],
+            'btts_yes': cp['btts_yes'], 'btts_no': cp['btts_no'],
+        }
+        custom_vbs = detector.analyze_match(
+            f"{custom_home} vs {custom_away}", custom_probs, custom_odds,
+            cc, data_completeness=0.9
+        )
+
+        if custom_vbs:
+            st.markdown("#### 💎 Value Bets Détectés")
+            for vb in sorted(custom_vbs, key=lambda x: x.confidence_score, reverse=True):
+                conf_color = confidence_color(vb.confidence_score)
+                badge_class = ("badge-premium" if "💎" in vb.label else "badge-value" if "🔥" in vb.label
+                              else "badge-risky" if "⚠️" in vb.label else "badge-good")
+                stake_amount = st.session_state.bankroll * vb.kelly_fraction
+                ev_color = '#00d68f' if vb.expected_value > 0 else '#ff4d6d'
+                vb_html = (
+                    f'<div class="pfa-card">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;" class="vb-card-header">'
+                    f'<div><span class="{badge_class}">{vb.label}</span>'
+                    f'<span style="color:#8892a4;font-size:0.85rem;margin-left:8px;">{vb.bet_type.value}</span></div>'
+                    f'<div style="font-family:Rajdhani,sans-serif;font-size:1.5rem;font-weight:700;color:#4facfe;" class="vb-odd-text">@{vb.bookmaker_odd:.2f}</div></div>'
+                    f'<div class="custom-vb-grid">'
+                    f'<div style="background:#111827;border-radius:8px;padding:0.5rem;text-align:center;">'
+                    f'<div style="color:#00d68f;font-weight:700;">{vb.model_prob*100:.1f}%</div>'
+                    f'<div style="color:#8892a4;font-size:0.7rem;">Modèle</div></div>'
+                    f'<div style="background:#111827;border-radius:8px;padding:0.5rem;text-align:center;">'
+                    f'<div style="color:#f5a623;font-weight:700;">{vb.implied_prob*100:.1f}%</div>'
+                    f'<div style="color:#8892a4;font-size:0.7rem;">Implicite</div></div>'
+                    f'<div style="background:#111827;border-radius:8px;padding:0.5rem;text-align:center;">'
+                    f'<div style="color:#00d68f;font-weight:700;">+{vb.edge_pct:.1f}%</div>'
+                    f'<div style="color:#8892a4;font-size:0.7rem;">Edge</div></div>'
+                    f'<div style="background:#111827;border-radius:8px;padding:0.5rem;text-align:center;">'
+                    f'<div style="color:#4facfe;font-weight:700;">€{stake_amount:.2f}</div>'
+                    f'<div style="color:#8892a4;font-size:0.7rem;">Mise Kelly</div></div></div>'
+                    f'<div style="display:flex;justify-content:space-between;">'
+                    f'<span style="color:#8892a4;font-size:0.78rem;">Confiance: <span style="color:{conf_color};font-weight:700;">{vb.confidence_score:.0f}/100</span></span>'
+                    f'<span style="color:#8892a4;font-size:0.78rem;">EV: <span style="color:{ev_color};font-weight:600;">{vb.expected_value:+.3f}</span></span></div></div>'
+                )
+                st.markdown(vb_html, unsafe_allow_html=True)
+        else:
+            st.info("❌ Aucun value bet détecté pour ce match avec les cotes actuelles.")
+
+# Footer
+st.markdown("""
+<div style="text-align:center; padding:2rem; color:#8892a4; font-size:0.75rem; border-top:1px solid #2a3a52; margin-top:2rem;">
+    ⚽ PRO-FOOT AI V3 · Dixon-Coles + xG + ELO · Usage éducatif uniquement<br>
+    ⚠️ Outil d'aide à la décision — pariez responsablement
+</div>
+""", unsafe_allow_html=True)
