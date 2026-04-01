@@ -307,22 +307,22 @@ class ValueBetDetector:
         implied_pct = bet['implied_prob'] * 100
 
         lines = [
-            f"Probabilité modèle: {model_pct:.1f}% vs implicite: {implied_pct:.1f}%",
-            f"Edge: +{edge_pct:.1f}%",
+            f"📊 Probabilité modèle: {model_pct:.1f}% vs probabilité implicite: {implied_pct:.1f}%",
+            f"📈 Edge détecté: +{edge_pct:.1f}% en faveur du modèle",
         ]
 
         if bet.get('xg_available'):
-            lines.append("Signal xG intégré")
+            lines.append("⚡ Signal xG intégré — renforce la confiance")
         if bet.get('elo_available'):
-            lines.append(f"ELO: {bet.get('elo_diff', 0):+.0f} pts")
+            lines.append(f"🏆 ELO: {bet.get('elo_diff', 0):+.0f} pts d'écart")
         if bet.get('form_signal') == 'strong':
-            lines.append("Forme favorable")
+            lines.append("📈 Forme récente favorable à ce pari")
 
         lines.append(
-            f"Kelly: {bet['kelly_fraction'] * 100:.1f}% bankroll"
+            f"💰 Kelly fractionné recommande {bet['kelly_fraction'] * 100:.1f}% de bankroll"
         )
 
-        return " · ".join(lines)
+        return " | ".join(lines)
 
     def analyze_match(self,
                        match_name: str,
