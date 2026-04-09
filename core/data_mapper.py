@@ -61,10 +61,10 @@ def estimate_strength_from_stats(team_stats: dict, home: bool = True) -> tuple:
     scored = goals.get("for", {}).get("total", {}).get("total", 0)
     conceded = goals.get("against", {}).get("total", {}).get("total", 0)
 
-    attack = round((scored / n_played) / 1.40, 2)   # 1.40 = moyenne ligues
-    defense = round((conceded / n_played) / 1.10, 2) # 1.10 = moyenne concédée
-    attack = max(0.5, min(attack, 3.0))
-    defense = max(0.5, min(defense, 2.5))
+    attack = round(scored / n_played, 2)
+    defense = round(conceded / n_played, 2)
+    attack = max(0.5, min(attack, 3.5))
+    defense = max(0.5, min(defense, 3.0))
     return attack, defense
 
 

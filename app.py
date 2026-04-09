@@ -934,22 +934,22 @@ with tab6:
             home_elo = KNOWN_ELO.get(custom_home, DEFAULT_ELO)
             away_elo = KNOWN_ELO.get(custom_away, DEFAULT_ELO)
 
-            # Force offensive/défensive estimée via ELO (formule relative)
-            elo_avg = 1700
-            home_att = round(1.0 + (home_elo - elo_avg) / 1000, 2)
-            home_def = round(1.0 + (home_elo - elo_avg) / 1200, 2)
-            away_att = round(1.0 + (away_elo - elo_avg) / 1000, 2)
-            away_def = round(1.0 + (away_elo - elo_avg) / 1200, 2)
+            # Force offensive/défensive estimée via ELO (base raw goals / match, moyenne ~1.4)
+            elo_avg = 1600
+            home_att = round(1.40 + (home_elo - elo_avg) / 250, 2)
+            home_def = round(1.40 - (home_elo - elo_avg) / 300, 2) # plus haut elo = moins de buts concédés
+            away_att = round(1.40 + (away_elo - elo_avg) / 250, 2)
+            away_def = round(1.40 - (away_elo - elo_avg) / 300, 2)
 
-            # Clamp les valeurs dans des ranges réalistes
-            home_att = max(0.6, min(home_att, 2.8))
-            home_def = max(0.6, min(home_def, 2.2))
-            away_att = max(0.6, min(away_att, 2.8))
-            away_def = max(0.6, min(away_def, 2.2))
+            # Clamp les valeurs dans des ranges réalistes (buts moyens d'une équipe)
+            home_att = max(0.6, min(home_att, 3.5))
+            home_def = max(0.6, min(home_def, 3.0))
+            away_att = max(0.6, min(away_att, 3.5))
+            away_def = max(0.6, min(away_def, 3.0))
 
-            # xG estimés
-            home_xg_auto = estimate_xg(home_att, away_def)
-            away_xg_auto = estimate_xg(away_att, home_def)
+            # xG estimés (raw prediction avant moteur)
+            home_xg_auto = round((home_att * away_def) / 1.40 + 0.25, 2)
+            away_xg_auto = round((away_att * home_def) / 1.40, 2)
 
             # Forme neutre (pas de données historiques disponibles en démo)
             home_form = [(2, 1), (1, 1), (2, 0), (1, 0), (2, 1)]
