@@ -5,18 +5,18 @@
 from typing import Dict
 
 # ── API ──────────────────────────────────────
-API_KEY: str = "6845fbe629e041bdb8f0cad7488a9fe2"
+API_KEY: str = "c490a4b8f2e3701f4fc450abd13d27f2"
 
-# ── Compétitions supportées ──────────────────
+# ── Compétitions supportées (Nouveaux IDs API-FOOTBALL) ──
 CHAMPIONNATS: Dict[str, str] = {
-    "🇪🇺 Champions League": "CL",
-    "🇪🇺 Europa League": "EL",
-    "🇫🇷 Ligue 1":          "FL1",
-    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "PL",
-    "🇪🇸 La Liga":           "PD",
-    "🇩🇪 Bundesliga":        "BL1",
-    "🇮🇹 Serie A":           "SA",
-    "🇳🇱 Eredivisie":        "DED",
+    "🇫🇷 Ligue 1":          "61",
+    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League": "39",
+    "🇪🇸 La Liga":           "140",
+    "🇩🇪 Bundesliga":        "78",
+    "🇮🇹 Serie A":           "135",
+    "🇳🇱 Eredivisie":        "88",
+    "🇪🇺 Champions League": "2",
+    "🇪🇺 Europa League":    "3",
 }
 
 # ── Modèle Poisson ───────────────────────────
