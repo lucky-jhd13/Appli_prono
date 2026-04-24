@@ -25,6 +25,19 @@ from core.bankroll import BankrollTracker, BacktestEngine
 from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL, LEAGUE_TEAMS
 
 
+def get_secret(name: str, default: str = "") -> str:
+    """Retourne un secret Streamlit sans planter si aucun secrets.toml n'existe."""
+    try:
+        return st.secrets.get(name, default)
+    except Exception:
+        return default
+
+
+def get_api_football_key() -> str:
+    """Priorise l'environnement local puis les secrets Streamlit."""
+    return os.environ.get("API_FOOTBALL_KEY", "") or get_secret("API_FOOTBALL_KEY", "")
+
+
 @st.cache_data(ttl=3600)  # Cache 1h pour ne pas exploser le quota API
 def load_live_matches(target_date_str: str) -> list:
     """
@@ -37,7 +50,7 @@ def load_live_matches(target_date_str: str) -> list:
         from datetime import date as dt_date
         import time
 
-        api_key = os.environ.get("API_FOOTBALL_KEY") or st.secrets.get("API_FOOTBALL_KEY", "")
+        api_key = get_api_football_key()
         if not api_key:
             return []
 
@@ -910,7 +923,7 @@ with tab6:
 
             # Tenter de récupérer les stats via API si mode Live activé
             home_stats_raw, away_stats_raw = {}, {}
-            api_key_env = os.environ.get("API_FOOTBALL_KEY") or (st.secrets.get("API_FOOTBALL_KEY", "") if hasattr(st, 'secrets') else "")
+            api_key_env = get_api_football_key()
 
             if api_key_env:
                 try:
