@@ -5,7 +5,6 @@ PRO-FOOT AI V3 — Configuration & Données de démonstration
 APP_CONFIG = {
     'app_name': 'PRO-FOOT AI V3',
     'version': '3.0.0',
-    'initial_bankroll': 1000.0,
     'kelly_fraction': 0.25,
     'max_bet_pct': 0.05,
     'min_edge': 0.03,
@@ -159,27 +158,4 @@ DEMO_MATCHES = [
         'odds': {'home_win': 2.70, 'draw': 3.10, 'away_win': 2.70,
                  'over_2.5': 2.10, 'under_2.5': 1.70, 'btts_yes': 1.85, 'btts_no': 1.90}
     },
-]
-
-DEMO_HISTORICAL = [
-    {'model_prob': 0.52, 'odd': 2.10, 'outcome': 1, 'confidence_score': 72, 'edge': 0.05},
-    {'model_prob': 0.65, 'odd': 1.75, 'outcome': 1, 'confidence_score': 81, 'edge': 0.08},
-    {'model_prob': 0.48, 'odd': 2.30, 'outcome': 0, 'confidence_score': 55, 'edge': 0.04},
-    {'model_prob': 0.71, 'odd': 1.60, 'outcome': 1, 'confidence_score': 85, 'edge': 0.09},
-    {'model_prob': 0.44, 'odd': 2.50, 'outcome': 1, 'confidence_score': 63, 'edge': 0.05},
-    {'model_prob': 0.58, 'odd': 1.95, 'outcome': 0, 'confidence_score': 68, 'edge': 0.06},
-    {'model_prob': 0.63, 'odd': 1.80, 'outcome': 1, 'confidence_score': 77, 'edge': 0.07},
-    {'model_prob': 0.38, 'odd': 3.00, 'outcome': 0, 'confidence_score': 48, 'edge': 0.05},
-    {'model_prob': 0.55, 'odd': 2.00, 'outcome': 1, 'confidence_score': 71, 'edge': 0.05},
-    {'model_prob': 0.70, 'odd': 1.65, 'outcome': 1, 'confidence_score': 88, 'edge': 0.12},
-    {'model_prob': 0.42, 'odd': 2.70, 'outcome': 0, 'confidence_score': 52, 'edge': 0.04},
-    {'model_prob': 0.60, 'odd': 1.90, 'outcome': 1, 'confidence_score': 74, 'edge': 0.06},
-    {'model_prob': 0.49, 'odd': 2.20, 'outcome': 0, 'confidence_score': 58, 'edge': 0.04},
-    {'model_prob': 0.66, 'odd': 1.72, 'outcome': 1, 'confidence_score': 82, 'edge': 0.09},
-    {'model_prob': 0.53, 'odd': 2.05, 'outcome': 1, 'confidence_score': 69, 'edge': 0.05},
-    {'model_prob': 0.75, 'odd': 1.55, 'outcome': 1, 'confidence_score': 91, 'edge': 0.14},
-    {'model_prob': 0.41, 'odd': 2.80, 'outcome': 1, 'confidence_score': 50, 'edge': 0.03},
-    {'model_prob': 0.57, 'odd': 1.98, 'outcome': 0, 'confidence_score': 66, 'edge': 0.06},
-    {'model_prob': 0.62, 'odd': 1.85, 'outcome': 1, 'confidence_score': 78, 'edge': 0.08},
-    {'model_prob': 0.47, 'odd': 2.35, 'outcome': 0, 'confidence_score': 54, 'edge': 0.04},
 ]

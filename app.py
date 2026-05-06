@@ -20,22 +20,8 @@ except ImportError:
     pass
 
 from core.engine_v3 import FootballEngineV3, EloSystem
-from core.value_betting import ValueBetDetector, KellyCalculator, ConfidenceScorer
-from core.bankroll import BankrollTracker, BacktestEngine
-from config import APP_CONFIG, DEMO_MATCHES, DEMO_HISTORICAL, LEAGUE_TEAMS
-
-
-def get_secret(name: str, default: str = "") -> str:
-    """Retourne un secret Streamlit sans planter si aucun secrets.toml n'existe."""
-    try:
-        return st.secrets.get(name, default)
-    except Exception:
-        return default
-
-
-def get_api_football_key() -> str:
-    """Priorise l'environnement local puis les secrets Streamlit."""
-    return os.environ.get("API_FOOTBALL_KEY", "") or get_secret("API_FOOTBALL_KEY", "")
+from core.value_betting import ValueBetDetector
+from config import DEMO_MATCHES, LEAGUE_TEAMS
 
 
 @st.cache_data(ttl=3600)  # Cache 1h pour ne pas exploser le quota API
@@ -50,7 +36,7 @@ def load_live_matches(target_date_str: str) -> list:
         from datetime import date as dt_date
         import time
 
-        api_key = get_api_football_key()
+        api_key = os.environ.get("API_FOOTBALL_KEY") or st.secrets.get("API_FOOTBALL_KEY", "")
         if not api_key:
             return []
 
@@ -419,10 +405,6 @@ st.markdown("""
 # ─────────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────────
-if 'bankroll' not in st.session_state:
-    st.session_state.bankroll = APP_CONFIG['initial_bankroll']
-if 'tracker' not in st.session_state:
-    st.session_state.tracker = BankrollTracker(st.session_state.bankroll)
 if 'predictions_cache' not in st.session_state:
     st.session_state.predictions_cache = {}
 
@@ -520,12 +502,6 @@ with st.sidebar:
         st.caption("🎭 Mode Démo — données simulées")
     st.divider()
 
-    st.markdown("**💰 Bankroll**")
-    bankroll = st.number_input("Montant (€)", min_value=10.0, max_value=100000.0,
-                                value=st.session_state.bankroll, step=50.0)
-    if bankroll != st.session_state.bankroll:
-        st.session_state.bankroll = bankroll
-    st.divider()
     st.markdown("**🔧 Filtres**")
     min_conf = st.slider("Confiance min", 0, 100, 50, 5)
     min_edge_pct = st.slider("Edge min (%)", 0, 20, 3, 1)
@@ -594,8 +570,8 @@ for match in filtered_matches:
 # ─────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "🏠 Dashboard", "📊 Analyse Match", "💰 Value Bets", "📈 Bankroll", "🔬 Backtesting", "⚽ Mon Match"
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🏠 Dashboard", "📊 Analyse Match", "💰 Value Bets", "⚽ Mon Match"
 ])
 
 # ═══════════════════════════════════════════════
@@ -733,7 +709,6 @@ with tab3:
             conf_color = confidence_color(vb.confidence_score)
             badge_class = ("badge-premium" if "💎" in vb.label else "badge-value" if "🔥" in vb.label
                           else "badge-risky" if "⚠️" in vb.label else "badge-good")
-            stake_amount = st.session_state.bankroll * vb.kelly_fraction
             ev_color = '#00d68f' if vb.expected_value > 0 else '#ff4d6d'
             # Split into smaller HTML chunks to prevent Streamlit rendering issues
             card_html = (
@@ -768,106 +743,16 @@ with tab3:
                 f'<div style="background:rgba(0,214,143,0.06);border-radius:8px;padding:0.6rem;margin-top:0.5rem;">'
                 f'<div style="color:#c8d0dc;font-size:0.8rem;">📌 {vb.explanation}</div></div>'
                 f'<div style="margin-top:0.6rem;display:flex;justify-content:space-between;">'
-                f'<span style="color:#8892a4;font-size:0.78rem;">Mise: <span style="color:#00d68f;font-weight:700;">€{stake_amount:.2f}</span></span>'
+                f'<span style="color:#8892a4;font-size:0.78rem;">Kelly: <span style="color:#00d68f;font-weight:700;">{vb.kelly_fraction*100:.1f}%</span></span>'
                 f'<span style="color:#8892a4;font-size:0.78rem;">EV: <span style="color:{ev_color};font-weight:600;">{vb.expected_value:+.3f}</span></span>'
                 f'</div></div>'
             )
             st.markdown(card_html, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════
-# TAB 4: BANKROLL
+# TAB 4: MON MATCH (CUSTOM ANALYSIS)
 # ═══════════════════════════════════════════════
 with tab4:
-    st.markdown('<div class="section-header">💰 Suivi Bankroll</div>', unsafe_allow_html=True)
-    tracker = st.session_state.tracker
-    stats = tracker.get_stats()
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.metric("Bankroll", f"€{stats['current_bankroll']:.2f}", delta=f"{stats['bankroll_growth']:+.1f}%")
-    with c2: st.metric("ROI", f"{stats['roi']:+.1f}%")
-    with c3: st.metric("Win Rate", f"{stats['win_rate']:.0f}%", delta=f"{stats['n_wins']}W / {stats['n_losses']}L")
-    with c4: st.metric("Max DD", f"-{stats['max_drawdown']:.1f}%")
-    st.markdown("---")
-    with st.expander("➕ Enregistrer un pari"):
-        ec1, ec2 = st.columns(2)
-        with ec1:
-            bet_match = st.text_input("Match")
-            bet_type_str = st.selectbox("Type", ["1", "X", "2", "O2.5", "U2.5", "BTTS+"])
-            bet_odd = st.number_input("Cote", min_value=1.01, value=2.00, step=0.05)
-        with ec2:
-            bet_stake = st.number_input("Mise (€)", min_value=1.0, value=20.0, step=5.0)
-            bet_prob = st.slider("Prob. modèle (%)", 0, 100, 55) / 100
-            bet_conf = st.slider("Score confiance", 0, 100, 70)
-        if st.button("💾 Enregistrer", type="primary"):
-            if bet_match:
-                tracker.add_bet(bet_match, bet_type_str, bet_odd, bet_stake, bet_prob, bet_conf)
-                st.success(f"Pari enregistré: {bet_match} — {bet_type_str} @{bet_odd}")
-                st.rerun()
-    pending = [b for b in tracker.bets if b.status == 'pending']
-    if pending:
-        st.markdown("#### ⏳ Paris en attente")
-        for bet in pending:
-            pc1, pc2, pc3, pc4 = st.columns([3, 1, 1, 1])
-            with pc1: st.write(f"**{bet.match}** — {bet.bet_type} @{bet.odd:.2f}")
-            with pc2: st.write(f"€{bet.stake:.2f}")
-            with pc3:
-                if st.button("✅ Gagné", key=f"win_{bet.id}"):
-                    tracker.resolve_bet(bet.id, True); st.rerun()
-            with pc4:
-                if st.button("❌ Perdu", key=f"loss_{bet.id}"):
-                    tracker.resolve_bet(bet.id, False); st.rerun()
-
-# ═══════════════════════════════════════════════
-# TAB 5: BACKTESTING
-# ═══════════════════════════════════════════════
-with tab5:
-    st.markdown('<div class="section-header">🔬 Backtesting & Simulation</div>', unsafe_allow_html=True)
-    bc1, bc2 = st.columns([1, 2])
-    with bc1:
-        st.markdown("#### ⚙️ Paramètres")
-        bt_strategy = st.selectbox("Stratégie", ['kelly_quarter', 'fixed_1pct', 'fixed_2pct'],
-            format_func=lambda x: {'kelly_quarter': 'Kelly 1/4', 'fixed_1pct': 'Fixe 1%', 'fixed_2pct': 'Fixe 2%'}[x])
-        bt_min_conf = st.slider("Confiance min (BT)", 0, 100, 60, 5)
-        bt_min_edge = st.slider("Edge min (BT, %)", 0, 15, 3, 1) / 100
-        bt_bankroll = st.number_input("Bankroll init.", 100, 100000, 1000, 100)
-        if st.button("🚀 Lancer", type="primary"):
-            bt_engine = BacktestEngine(initial_bankroll=float(bt_bankroll))
-            st.session_state.bt_result = bt_engine.run(
-                DEMO_HISTORICAL, strategy=bt_strategy, min_confidence=float(bt_min_conf), min_edge=bt_min_edge)
-    with bc2:
-        if 'bt_result' in st.session_state:
-            r = st.session_state.bt_result
-            if 'error' in r:
-                st.error(r['error'])
-            else:
-                st.markdown(f"#### 📊 Résultats — {r['strategy']}")
-                rc1, rc2, rc3 = st.columns(3)
-                with rc1: st.metric("ROI", f"{r['roi']:+.1f}%", delta="profitable" if r['roi'] > 0 else "perte")
-                with rc2: st.metric("Win Rate", f"{r['win_rate']:.0f}%")
-                with rc3: st.metric("Bankroll finale", f"€{r['final_bankroll']:.0f}", delta=f"{r['bankroll_growth_pct']:+.1f}%")
-                rc4, rc5, rc6 = st.columns(3)
-                with rc4: st.metric("Max DD", f"-{r['max_drawdown_pct']:.1f}%")
-                with rc5: st.metric("Sharpe", f"{r['sharpe']:.2f}")
-                with rc6: st.metric("Paris", r['n_bets'])
-                if r['bankroll_history']:
-                    bk_df = pd.DataFrame({'Paris': range(len(r['bankroll_history'])), 'Bankroll (€)': r['bankroll_history']})
-                    st.line_chart(bk_df.set_index('Paris'), color='#00d68f')
-                    bt_all = BacktestEngine(initial_bankroll=float(bt_bankroll))
-                    comp = bt_all.compare_strategies(DEMO_HISTORICAL)
-                    if comp:
-                        st.markdown("#### 📋 Comparaison stratégies")
-                        comp_df = pd.DataFrame([{
-                            'Stratégie': x['strategy'], 'ROI': f"{x['roi']:+.1f}%",
-                            'Win Rate': f"{x['win_rate']:.0f}%", 'Bankroll': f"€{x['final_bankroll']:.0f}",
-                            'Sharpe': f"{x['sharpe']:.2f}",
-                        } for x in comp])
-                        st.dataframe(comp_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("👈 Configurez et lancez un backtest")
-
-# ═══════════════════════════════════════════════
-# TAB 6: MON MATCH (CUSTOM ANALYSIS)
-# ═══════════════════════════════════════════════
-with tab6:
     st.markdown('<div class="section-header">⚽ Analyse Personnalisée</div>', unsafe_allow_html=True)
     st.markdown(
         '<div style="color:#8892a4; font-size:0.9rem; margin-bottom:1.5rem;">'
@@ -923,7 +808,7 @@ with tab6:
 
             # Tenter de récupérer les stats via API si mode Live activé
             home_stats_raw, away_stats_raw = {}, {}
-            api_key_env = get_api_football_key()
+            api_key_env = os.environ.get("API_FOOTBALL_KEY") or (st.secrets.get("API_FOOTBALL_KEY", "") if hasattr(st, 'secrets') else "")
 
             if api_key_env:
                 try:
@@ -1064,7 +949,6 @@ with tab6:
                 conf_color = confidence_color(vb.confidence_score)
                 badge_class = ("badge-premium" if "💎" in vb.label else "badge-value" if "🔥" in vb.label
                               else "badge-risky" if "⚠️" in vb.label else "badge-good")
-                stake_amount = st.session_state.bankroll * vb.kelly_fraction
                 ev_color = '#00d68f' if vb.expected_value > 0 else '#ff4d6d'
                 vb_html = (
                     f'<div class="pfa-card">'
@@ -1083,8 +967,8 @@ with tab6:
                     f'<div style="color:#00d68f;font-weight:700;">+{vb.edge_pct:.1f}%</div>'
                     f'<div style="color:#8892a4;font-size:0.7rem;">Edge</div></div>'
                     f'<div style="background:#111827;border-radius:8px;padding:0.5rem;text-align:center;">'
-                    f'<div style="color:#4facfe;font-weight:700;">€{stake_amount:.2f}</div>'
-                    f'<div style="color:#8892a4;font-size:0.7rem;">Mise Kelly</div></div></div>'
+                    f'<div style="color:#4facfe;font-weight:700;">{vb.kelly_fraction*100:.1f}%</div>'
+                    f'<div style="color:#8892a4;font-size:0.7rem;">Kelly</div></div></div>'
                     f'<div style="display:flex;justify-content:space-between;margin-top:0.4rem;">'
                     f'<span style="color:#8892a4;font-size:0.78rem;">Confiance: <span style="color:{conf_color};font-weight:700;">{vb.confidence_score:.0f}/100</span></span>'
                     f'<span style="color:#8892a4;font-size:0.78rem;">EV: <span style="color:{ev_color};font-weight:600;">{vb.expected_value:+.3f}</span></span></div></div>'
