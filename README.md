@@ -85,6 +85,17 @@ JWT_SECRET_KEY=votre_cle_secrete_longue_ici
 API_FOOTBALL_KEY=votre_cle_api_football_live
 ```
 
+
+## 🧹 Clean‑up Log
+
+- `frontend/AGENTS.md` – redundant dev guide, merged into README.
+- `.streamlit/` – legacy Streamlit configuration, not used by Next.js UI.
+- `app.py` – duplicate FastAPI entry point, backend now starts via `backend/main.py`.
+- `tests/` – removed because no test suite is present; can be re‑added later.
+- `.gitignore` – updated to remove the `.streamlit/secrets.toml` entry.
+
 ---
+
+*Développé avec 💚 pour dompter les bookmakers grâce aux mathématiques.*
 
 *Développé avec 💚 pour dompter les bookmakers grâce aux mathématiques.*

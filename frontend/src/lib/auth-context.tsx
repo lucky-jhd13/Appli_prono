@@ -4,13 +4,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface AuthState {
-  token: str | null;
+  token: string | null;
   isPremium: boolean;
   userId: number | null;
 }
 
 interface AuthContextType extends AuthState {
-  login: (token: str, isPremium: boolean, userId: number) => void;
+  login: (token: string, isPremium: boolean, userId: number) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (token: str, isPremium: boolean, userId: number) => {
+  const login = (token: string, isPremium: boolean, userId: number) => {
     localStorage.setItem("pf_token", token);
     localStorage.setItem("pf_premium", String(isPremium));
     localStorage.setItem("pf_user_id", String(userId));

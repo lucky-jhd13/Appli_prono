@@ -5,6 +5,6 @@ env/
 venv/
 .env
 .DS_Store
-.streamlit/secrets.toml
+# .streamlit/secrets.toml removed – legacy Streamlit config
 *.db
 profoot.db
